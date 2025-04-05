@@ -1,0 +1,348 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f5f5f5;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    color: #333;
+}
+
+.quiz-app {
+    background-color: white;
+    border-radius: 15px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    width: 90%;
+    max-width: 600px;
+    overflow: hidden;
+    position: relative;
+}
+
+.category-selector, .quiz-interface, .end-screen {
+    padding: 30px;
+}
+
+h2 {
+    color: #2c3e50;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.category-btn {
+    display: block;
+    width: 100%;
+    padding: 15px;
+    margin-bottom: 15px;
+    border: none;
+    border-radius: 8px;
+    background-color: #3498db;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.category-btn:hover {
+    background-color: #2980b9;
+    transform: translateY(-2px);
+}
+
+.category-btn.locked {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+}
+
+.category-btn.locked::after {
+    content: "🔒";
+    position: absolute;
+    right: 15px;
+}
+
+.lock-info {
+    font-size: 14px;
+    color: #e74c3c;
+    text-align: center;
+    margin-top: -10px;
+    margin-bottom: 15px;
+}
+
+.quiz-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.quiz-title {
+    font-size: 24px;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.quiz-category {
+    background-color: #e74c3c;
+    color: white;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 14px;
+}
+
+.progress-container {
+    background-color: #ecf0f1;
+    height: 10px;
+    border-radius: 5px;
+    margin-bottom: 25px;
+}
+
+.progress-bar {
+    background-color: #2ecc71;
+    height: 100%;
+    border-radius: 5px;
+    width: 0%;
+    transition: width 0.5s ease;
+}
+
+.question-number {
+    color: #7f8c8d;
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.question-text {
+    font-size: 20px;
+    margin-bottom: 25px;
+    line-height: 1.4;
+}
+
+.options-container {
+    margin-bottom: 20px;
+}
+
+.option {
+    background-color: #ecf0f1;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.option:hover {
+    background-color: #d6eaf8;
+}
+
+.option.correct {
+    background-color: #2ecc71;
+    color: white;
+}
+
+.option.wrong {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.message {
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: none;
+}
+
+.message.correct {
+    background-color: #d5f5e3;
+    color: #27ae60;
+}
+
+.message.wrong {
+    background-color: #fadbd8;
+    color: #e74c3c;
+}
+
+.quiz-footer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+}
+
+.stats-container {
+    display: flex;
+    align-items: center;
+}
+
+.timer-container, .score-container, .lives-container, .stars-container {
+    display: flex;
+    align-items: center;
+    margin-right: 15px;
+}
+
+.timer, .score, .lives-count, .stars-count {
+    margin-left: 5px;
+    font-weight: bold;
+}
+
+.heart {
+    color: #e74c3c;
+}
+
+.star {
+    color: #f1c40f;
+}
+
+.end-screen {
+    text-align: center;
+}
+
+.end-title {
+    color: #2c3e50;
+    margin-bottom: 20px;
+}
+
+.final-score {
+    font-size: 24px;
+    margin-bottom: 30px;
+    color: #e74c3c;
+}
+
+.restart-btn {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 8px;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.restart-btn:hover {
+    background-color: #2980b9;
+    transform: translateY(-2px);
+}
+
+.stars-earned-container {
+    margin-bottom: 30px;
+}
+
+.star-earned {
+    font-size: 2rem;
+    margin: 0 5px;
+}
+
+.bonus-message {
+    color: #f39c12;
+    font-weight: bold;
+    margin-top: 15px;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.streak-counter {
+    background-color: #f39c12;
+    color: white;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 14px;
+    margin-left: 10px;
+    display: none;
+}
+
+.powerups-container {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.powerup-btn {
+    background-color: #9b59b6;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.powerup-btn:hover {
+    background-color: #8e44ad;
+    transform: translateY(-3px);
+}
+
+.powerup-btn:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.joker-container {
+    margin-top: 15px;
+    text-align: center;
+}
+
+.joker-btn {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.joker-btn:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+}
+
+.unlock-animation {
+    animation: unlock 1.5s;
+}
+
+@keyframes unlock {
+    0% { transform: scale(1); box-shadow: 0 0 0 rgba(46, 204, 113, 0.4); }
+    50% { transform: scale(1.05); box-shadow: 0 0 20px rgba(46, 204, 113, 0.8); }
+    100% { transform: scale(1); box-shadow: 0 0 0 rgba(46, 204, 113, 0.4); }
+}
+
+.buy-heart-btn {
+    background-color: #2ecc71;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 14px;
+    cursor: pointer;
+    margin-left: 10px;
+    transition: all 0.3s ease;
+}
+
+.buy-heart-btn:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+    .quiz-footer {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .stats-container {
+        justify-content: space-between;
+        width: 100%;
+    }
+}

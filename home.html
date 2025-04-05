@@ -1,0 +1,2903 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUIZZY - Ultimate Quiz Game</title>
+   <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="quiz-app">
+        <!-- Écran de sélection de catégorie -->
+        <div class="category-selector" id="categorySelector">
+            <h2>Choisissez une catégorie</h2>
+            <div class="difficulty-selector">
+                <button class="difficulty-btn" onclick="setDifficulty('easy')">Facile</button>
+                <button class="difficulty-btn active" onclick="setDifficulty('medium')">Moyen</button>
+                <button class="difficulty-btn" onclick="setDifficulty('hard')">Difficile</button>
+            </div>
+            
+            <button class="category-btn" onclick="startGame('history')">Histoire</button>
+            <button class="category-btn" onclick="startGame('science')">Science</button>
+            <button class="category-btn locked" id="sportCategoryBtn" onclick="checkCategoryLock('sport')">Sport</button>
+            <div id="sportLockInfo" class="lock-info">Débloquez avec 70 étoiles (Vous avez <span id="sportStarsNeeded">0</span>/70)</div>
+            
+            <button class="category-btn locked" id="musicCategoryBtn" onclick="checkCategoryLock('music')">Musique</button>
+            <div id="musicLockInfo" class="lock-info">Débloquez avec 100 étoiles (Vous avez <span id="musicStarsNeeded">0</span>/100)</div>
+            
+            <div class="total-stars-container" style="text-align: center; margin-top: 20px;">
+                <strong>Étoiles totales: <span id="totalStarsCount">0</span></strong>
+            </div>
+        </div>
+        
+        <!-- Interface principale du quiz (cachée au début) -->
+        <div id="quizInterface" style="display: none;">
+            <div class="quiz-header">
+                <div class="quiz-title">QUIZZY</div>
+                <div class="quiz-category" id="quizCategory"></div>
+            </div>
+            
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            
+            <div class="question-container">
+                <div class="question-number" id="questionNumber">Question 01</div>
+                <div class="question-text" id="questionText"></div>
+                
+                <div class="options-container" id="optionsContainer">
+                    <!-- Options ajoutées dynamiquement -->
+                </div>
+                
+                <div class="message" id="message"></div>
+                
+                <div id="bonusMessage" class="bonus-message" style="display: none;"></div>
+            </div>
+            
+            <div class="quiz-footer">
+                <div class="stats-container">
+                    <div class="timer-container">
+                        <span>⏱️</span>
+                        <span class="timer" id="timer">20s</span>
+                    </div>
+                    <div class="score-container">
+                        <span>Score:</span>
+                        <span class="score" id="score">0</span>
+                        <div id="streakCounter" class="streak-counter" style="display: none;">0</div>
+                    </div>
+                </div>
+                
+                <div class="stats-container">
+                    <div class="lives-container" id="livesContainer">
+                        <span class="heart">❤️</span>
+                        <span id="livesCount">5</span>
+                        <button id="buyHeartBtn" class="buy-heart-btn" onclick="tradeStarsForHearts()" title="5 étoiles pour 1 cœur" disabled>+1 (5⭐)</button>
+                    </div>
+                    <div class="stars-container" id="starsContainer">
+                        <span class="star">⭐</span>
+                        <span id="starsCount">0</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="powerups-container">
+                <button class="powerup-btn" id="extraTimeBtn" onclick="usePowerup('extraTime')" title="+10 secondes">⏳</button>
+                <button class="powerup-btn" id="skipQuestionBtn" onclick="usePowerup('skipQuestion')" title="Passer la question">↪️</button>
+                <button class="powerup-btn" id="fiftyFiftyBtn" onclick="usePowerup('fiftyFifty')" title="50/50">50/50</button>
+            </div>
+            
+            <div class="joker-container" id="jokerContainer" style="display: none;">
+                <button class="joker-btn" id="useJokerBtn" onclick="useJoker()">Utiliser la carte Joker</button>
+            </div>
+        </div>
+        
+        <!-- Écran de fin (caché au début) -->
+        <div class="end-screen" id="endScreen">
+            <h2 class="end-title">Quiz Terminé !</h2>
+            <div class="final-score" id="finalScore">Votre score final: 0</div>
+            <div id="starsEarnedContainer"></div>
+            <div id="endMessage" style="margin-bottom: 20px;"></div>
+            <button class="restart-btn" onclick="restartGame()">Rejouer</button>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let currentCategory = '';
+        let currentQuestions = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let lives = 5;
+        let starsEarned = 0;
+        let totalStars = parseInt(localStorage.getItem('totalStars')) || 0;
+        let timer;
+        let timeLeft = 20;
+        let streakCount = 0;
+        let consecutiveCorrectAnswers = 0;
+        let currentDifficulty = 'medium';
+        let jokerAvailable = false;
+        let powerups = {
+            extraTime: 1,
+            skipQuestion: 1,
+            fiftyFifty: 1
+        };
+        
+        // Questions par catégorie (conservées intactes)
+        const questionsByCategory = {
+            history: [
+                    {
+                        question: "Quel pays de l'Afrique de l'Ouest a été colonisé par la France et le Royaume-Uni ?",
+                        options: ["A. Ghana", "B. Togo", "C. Bénin", "D. Côte d'Ivoire"],
+                        correctAnswer: "B"
+                    },
+                    // ... (toutes les autres questions d'histoire)
+                    {
+                        question: "Quelle est la capitale du Burkina Faso ?",
+                        options: ["A. Lomé", "B. Ouagadougou", "C. Niamey", "D. Bamako"],
+                        correctAnswer: "B"
+                    },
+                    // Ajoutez d'autres questions...
+                    {
+                    question: "Quel royaume africain a construit le grand Zimbabwe?",
+                    options: ["A. Royaume Zimbabwe ", "B. Royaume d'Aksoum", "C. Royaume du Kongo", "D. Royaume du Bénin"],
+                    correctAnswer: "A"
+                    },
+                    {
+                    question: "Quel élement a marqué le début de la réolution française en 1789?",
+                    options: ["A. La prise de la Bastille", "B. La bataille de Waterloo", "C. Le couronnement de Napoléon", "D. La signature du traité de Versailles"],
+                    correctAnswer: "A"
+                    },
+                    {   
+                    question: "Qui a découvert la pénicille ?",
+                    options: ["A. Louis Pasteur", "B. Alexander Fleming", "C. Marie Curie", "D. Isac Newton"],
+                    correctAnswer: "B"
+                    },
+                    {
+                    question: "Quel dynastie a construit la Grande Muraille ?",
+                    options: ["A. Dynastie Ming", "B. Dynastie Han", "C. Dynastie Qin", "D. Dynastie Tang "],
+                    correctAnswer: "C"
+                    },
+                    {
+                    question: "Qui était le fondateur de l'empire Mongol ?",
+                    options: ["A. Kubilai Khan", "B. Gengis Khan", "C. Tamerlan", "D. Attila"],
+                    correctAnswer: "B"
+                    },  
+                    {
+                    question: "Quelle civilsation précolombienne a construit Machu Pichu ?",
+                    options: ["A. Les Aztèques", "B. Les Mayas", "C. Les Incas", "D. Les OLmèques"],
+                    correctAnswer: "C"
+                    },
+                    {
+                    question: "Qui a dirigé la Révolution haïtienne contre les français ?",
+                    options: ["A. Toussaint Louverture", "B. Simon Bolivar", "C. Che Guevara", "D. Fidel Castro"],
+                    correctAnswer: "A"
+                    },
+                    {
+                    question: "Quel peuple autochtone est originaire de Nouvelle-Zélande ",
+                    options: ["A. Les Comoriens", "B. Les Maoris", "C. Les polynésiens", "D. Les Mélanésiens"],
+                    correctAnswer: "B"
+                    },
+                    {
+                    question: "Qui était le premier européen à atteindre l'Australie? ",
+                    options: ["A. Christophe Colomb ", "B. James Cook", "C. Abel Tasman", "D. Willem Janszoon"],
+                    correctAnswer: "D"
+                    },
+                    {
+                    question: "Quel est le plus grand désert du monde situé en Afrique?",
+                    options: ["A. Désert du kalahari", "B. Désert du Namib", "C. Désert du Sahara", "D. Désert du Libye"],
+                    correctAnswer: "C"
+                    },  
+                    {
+                    question: "Quel fleuve est considéré comme le plus long d'Afrique ",
+                    options: ["A. Le Nil", "B. Le Niger", "C. Le Congo", "D. Le zambèze"],
+                    correctAnswer: "A"
+                    },
+                    {
+                    question: "Quel est le plus long fleuve d'Europe ",
+                    options: ["A. Le Danube", "B. La Volga", "C. Le Rhin", "D. La Seine"],
+                    correctAnswer: "B"
+                    },
+                    {
+                    question: "Quel pays européen est connu comme le ( Pays des mille lacs ) ?",
+                    options: ["A. La Suède", "B. Le Canada", "C. La norvège", "D. La Finlande"],
+                    correctAnswer: "D"
+                    },
+                    {
+                    question: "Quel est le plus haut sommet du monde? ",
+                    options: ["A. Mont Kilimandjaro", "B. Mont Everest", "C. Mont K2", "D. Mont Fuji"],
+                    correctAnswer: "B"
+                    },
+                    {
+                    question: "Quel désert asiatique est l'un des plus grands au monde ?",
+                    options: ["A. Désert de Gobi", "B. Désert d'Arabie", "C. Désert du Thar", "D. Désert  de Taklamakan"],
+                    correctAnswer: "A"
+                    },
+                    {
+                    question: "Quel fôret tropicale est la plus grande du monde ?",
+                    options: ["A. Fôret de Bè", "B. Fôret du Congo", "C. Fôret Amazonienne", "D. Fôret de Sumatra"],
+                    correctAnswer: "C"
+                    },
+                    {
+                    question: "Quel est le plus grand lac d'Amérque du Nord ?",
+                    options: ["A. Lac Michigan", "B. Lac Huron", "C. Lac Ontario", "D. Lac supérieur"],
+                    correctAnswer: "D"
+                    },
+                    {
+                    question: "Quelle barrière de Corail est la plus grande au monde ?",
+                    options: ["A. Grande barrière de Corail", "B. Barrière de corail de Nouelle-Calédonie", "C. Barrière de Corail des caraïbes", "D. Barrière de Corail des Maldives"],
+                    correctAnswer: "A"
+                    }, 
+                    {
+                    question: "Quel est le plus haut sommet de la Nouelle-Zélande ?",
+                    options: ["A. Mont Everest", "B. Mont Kosciuszko", "C. Mont Cook", "D. Mont Kilimandjaro"],
+                    correctAnswer: "C"
+                    },
+                    {
+                    question: "Quelle langue est largement parlée en Afrique de l'Est ?",
+                    options: ["A. Yoruba", "B. Swahili", "C. Zoulou", "D. Amharique"],
+                    correctAnswer: "B"
+                    },
+                    {
+            question: "Quel roi africain a fait un pèlerinage à La Mecque en distribuant tellement d'or qu'il a fait baisser son prix sur les marchés ?",
+            options: ["A. Sundiata Keita", "B. Mansa Moussa", "C. Shaka Zoulou", "D. Haïlé Sélassié"],
+            correctAnswer: "B"
+                    },
+                    {
+                question: "Quel roi éthiopien a vaincu les Italiens à la bataille d'Adowa en 1896 ?",
+                options: ["A. Menelik II", "B. Haïlé Sélassié", "C. Tewodros II", "D. Yohannes IV"],
+                correctAnswer: "A"
+                    },
+                    {
+                question: "Quel pays africain a été le premier à adopter le christianisme comme religion d'État ?",
+                options: ["A. Kenya", "B. Égypte", "C. Soudan", "D.  Éthiopie"],
+                correctAnswer: "D"
+                    },
+                    {
+                question: "Quel roi anglais a signé la Magna Carta en 1215 ?",
+                options: ["A. Richard Cœur de Lion", "B. Jean sans Terre", "C. Henri VIII", "D. Guillaume le Conquérant"],
+                 correctAnswer: "B"
+                    },
+                    {
+                    question: "Quel événement a marqué le début de la Renaissance en Europe ?",
+                    options: ["A. La chute de Constantinople", "B. La découverte de l'Amérique", "C. L'invention de l'imprimerie", "D. La Réforme protestante"],
+                    correctAnswer: "A"
+                    },
+                    {
+                    question: "Qui a dirigé la Révolution russe de 1917 ?",
+                    options: ["A. Staline", "B. Lénine", "C. Trotski", "D. Nicolas II"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel empereur romain a construit le Colisée ?",
+                    options: ["A. Jules César", "B. Auguste", "C. Néron", "D. Vespasien"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel traité a mis fin à la guerre de Cent Ans entre la France et l'Angleterre ?",
+                    options: ["A. Traité de Paris", "B. Traité de Troyes", "C. Traité de Brétigny", "D. Traité de Calais"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays asiatique a été le premier à adopter le bouddhisme comme religion d'État ?",
+                    options: ["A. Inde", "B. Chine", "C. Sri Lanka", "D. Japon"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel pays asiatique a été le premier à utiliser la poudre à canon ?",
+                    options: ["A. Chine", "B. Japon", "C. Inde", "D. Corée"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel empereur japonais a initié l'ère Meiji en 1868 ?",
+                    options: ["A. Hirohito", "B. Meiji", "C. Akihito", "D. Jimmu"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel empire asiatique était connu pour ses routes commerciales, comme la Route de la Soie ?",
+                    options: ["A. Empire mongol", "B. Empire ottoman", "C. Empire perse", "D. Empire chinois"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Qui a été le premier président noir des États-Unis ?",
+                    options: ["A. Barack Obama", "B. Martin Luther King", "C. Nelson Mandela", "D. Malcolm X"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel explorateur européen a découvert les îles Tonga en 1616 ?",
+                    options: ["A. James Cook", "B. Abel Tasman", "C. Willem Schouten", "D. Ferdinand Magellan"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel peuple autochtone est originaire des îles Fidji ?",
+                    options: ["A. Maoris", "B. Aborigènes", "C. Mélanésiens", "D. Polynésiens"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel pays océanien a été colonisé par les Britanniques et les Français ?",
+                    options: ["A. Nouvelle-Zélande", "B. Vanuatu", "C. Fidji", "D. Samoa"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le plus grand lac d'Afrique en superficie ?",
+                    options: ["A. Lac Victoria", "B. Lac Tanganyika", "C. Lac Malawi", "D. Lac Turkana"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel désert africain est connu pour ses dunes de sable rouge ?",
+                    options: ["A. Désert du Sahara", "B. Désert du Namib", "C. Désert du Kalahari", "D. Désert de Libye"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le plus grand parc national d'Afrique, situé en Tanzanie ?",
+                    options: ["A. Parc national Kruger", "B. Parc national du Serengeti", "C. Parc national de Chobe", "D. Parc national de Virunga"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le plus petit pays du monde ?",
+                    options: ["A. Monaco", "B. Saint-Marin", "C. Vatican", "D. Liechtenstein"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel fleuve traverse Paris ?",
+                    options: ["A. Le Rhin", "B. Le Danube", "C. La Tamise", "D. La Seine"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel pays asiatique est composé de plus de 17 000 îles ?",
+                    options: ["A. Indonésie", "B. Philippines", "C. Japon", "D. Maldives"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le plus grand pays d'Asie en termes de superficie ?",
+                    options: ["A. Chine", "B. Inde", "C. Russie", "D. Kazakhstan"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel fleuve est sacré en Inde ?",
+                    options: ["A. Yamuna", "B. Indus", "C. Brahmapoutre", "D. Gange"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel pays américain est connu pour ses glaciers, comme le glacier Perito Moreno ?",
+                    options: ["A. Argentine", "B. Chili", "C. Canada", "D. États-Unis"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le plus grand atoll du monde, situé en Océanie ?",
+                    options: ["A. Atoll de Bikini", "B. Atoll de Rangiroa", "C. Atoll de Kwajalein", "D. Atoll de Funafuti"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel pays océanien est composé de plus de 300 îles ?",
+                    options: ["A. Fidji", "B. Samoa", "C. Tonga", "D. Vanuatu"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel océan entoure principalement les îles de l'Océanie ?",
+                    options: ["A. Atlantique", "B. Indien", "C. Pacifique", "D. Arctique"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel est le plus grand récif corallien du monde après la Grande Barrière de Corail ?",
+                    options: ["A. Récif de Nouvelle-Calédonie", "B. Récif des Maldives", "C. Récif de Belize", "D. Récif des Caraïbes"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel instrument de musique africain est un tambour en forme de calice ?",
+                    options: ["A. Djembé", "B. Kora", "C. Balafon", "D. Talking Drum"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quelle danse traditionnelle est originaire du Sénégal ?",
+                    options: ["A. Samba", "B. Kizomba", "C. Sambar", "D. Tango"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel festival africain célèbre la fin de la récolte du mil ?",
+                    options: ["A. Festival de Durbar", "B. Festival de Yam", "C. Festival de Calabar", "D. Festival de Lagos"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel festival espagnol est connu pour ses taureaux lâchés dans les rues ?",
+                    options: ["A. La Tomatina", "B. Las Fallas", "C. San Fermín", "D. Feria de Séville"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel costume traditionnel est porté en Écosse ?",
+                    options: ["A. Kimono", "B. Kilt", "C. Dirndl", "D. Sari"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel festival allemand est célèbre pour sa bière et ses tentes géantes ?",
+                    options: ["A. Oktoberfest", "B. Carnaval de Cologne", "C. Fête de la Bière", "D. Festival de Berlin"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Qui a dirigé la résistance algérienne contre la colonisation française au XIXᵉ siècle ?",
+                    options: ["A. Samori Touré", "B. Abdelkader El Djezaïri", "C. Shaka Zoulou", "D. Menelik II"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel roi français a été surnommé le 'Roi-Soleil' ?",
+                    options: ["A. Louis XIV", "B. Louis XVI", "C. Henri IV", "D. François Ier"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel événement a marqué le début de la Seconde Guerre mondiale en Europe ?",
+                    options: ["A. Invasion de la Pologne", "B. Bataille de Stalingrad", "C. Débarquement de Normandie", "D. Bombardement de Pearl Harbor"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel traité a mis fin à la guerre de Cent Ans entre la France et l'Angleterre ?",
+                    options: ["A. Traité de Paris", "B. Traité de Troyes", "C. Traité de Brétigny", "D. Traité de Calais"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel empire a dominé la Méditerranée à partir de l'an 27 avant J.-C. ?",
+                    options: ["A. Empire romain", "B. Empire byzantin", "C. Empire perse", "D. Empire ottoman"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel événement marque le début du Moyen Âge en Europe ?",
+                    options: ["A. La chute de l'Empire romain d'Occident", "B. La naissance de Jésus-Christ", "C. La découverte de l'Amérique", "D. La Réforme protestante"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel conquérant a fondé l'un des plus grands empires de l'histoire au XIIIᵉ siècle ?",
+                    options: ["A. Alexandre le Grand", "B. Gengis Khan", "C. Napoléon Bonaparte", "D. Jules César"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel événement a marqué la fin de l'Empire byzantin en 1453 ?",
+                    options: ["A. La chute de Constantinople", "B. La bataille de Lépante", "C. La prise de Rome", "D. La chute de Bagdad"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel explorateur a découvert l'Amérique en 1492 ?",
+                    options: ["A. Vasco de Gama", "B. Christophe Colomb", "C. Ferdinand Magellan", "D. Marco Polo"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel événement a marqué le début de la Réforme protestante en 1517 ?",
+                    options: ["A. La publication des 95 thèses de Martin Luther", "B. La guerre de Trente Ans", "C. Le concile de Trente", "D. La paix d'Augsbourg"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel traité a mis fin à la Première Guerre mondiale en 1919 ?",
+                    options: ["A. Traité de Versailles", "B. Traité de Tordesillas", "C. Traité de Paris", "D. Traité de Berlin"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays européen a été divisé en deux après la Seconde Guerre mondiale ?",
+                    options: ["A. Allemagne", "B. France", "C. Italie", "D. Espagne"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays a été le premier à envoyer un homme dans l'espace en 1961 ?",
+                    options: ["A. États-Unis", "B. Union soviétique", "C. Chine", "D. France"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel événement a marqué la fin de la guerre froide en 1991 ?",
+                    options: ["A. La chute du mur de Berlin", "B. La dissolution de l'Union soviétique", "C. La crise des missiles de Cuba", "D. La guerre du Vietnam"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel pays a été le premier à légaliser le mariage homosexuel en 2001 ?",
+                    options: ["A. Pays-Bas", "B. Canada", "C. Espagne", "D. Suède"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel événement a marqué le début du printemps arabe en 2010 ?",
+                    options: ["A. La révolution tunisienne", "B. La guerre en Syrie", "C. La chute de Moubarak en Égypte", "D. La crise libyenne"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Qui a inventé l'imprimerie à caractères mobiles au XVᵉ siècle ?",
+                    options: ["A. Johannes Gutenberg", "B. Leonardo da Vinci", "C. Isaac Newton", "D. Galilée"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Qui a formulé la théorie de la relativité au début du XXᵉ siècle ?",
+                    options: ["A. Isaac Newton", "B. Albert Einstein", "C. Stephen Hawking", "D. Niels Bohr"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Qui a été le premier à marcher sur la Lune en 1969 ?",
+                    options: ["A. Neil Armstrong", "B. Buzz Aldrin", "C. Yuri Gagarin", "D. John Glenn"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Qui a inventé le World Wide Web en 1989 ?",
+                    options: ["A. Tim Berners-Lee", "B. Bill Gates", "C. Steve Jobs", "D. Mark Zuckerberg"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel peintre italien a réalisé la fresque de la Chapelle Sixtine ?",
+                    options: ["A. Léonard de Vinci", "B. Michel-Ange", "C. Raphaël", "D. Botticelli"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel écrivain français a écrit 'Les Misérables' ?",
+                    options: ["A. Victor Hugo", "B. Gustave Flaubert", "C. Albert Camus", "D. Marcel Proust"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel artiste espagnol est connu pour son tableau 'Guernica' ?",
+                    options: ["A. Salvador Dalí", "B. Pablo Picasso", "C. Francisco de Goya", "D. Joan Miró"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel écrivain russe a écrit 'Guerre et Paix' ?",
+                    options: ["A. Fiodor Dostoïevski", "B. Léon Tolstoï", "C. Anton Tchekhov", "D. Vladimir Nabokov"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel compositeur allemand a composé la 'Symphonie n°9' ?",
+                    options: ["A. Wolfgang Amadeus Mozart", "B. Ludwig van Beethoven", "C. Johann Sebastian Bach", "D. Richard Wagner"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quelle religion a été fondée par Jésus-Christ au Iᵉᵉ siècle ?",
+                    options: ["A. Christianisme", "B. Islam", "C. Judaïsme", "D. Bouddhisme"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel prophète a fondé l'islam au VIIᵉ siècle ?",
+                    options: ["A. Mahomet", "B. Jésus", "C. Moïse", "D. Bouddha"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel événement marque le début du calendrier musulman en 622 ?",
+                    options: ["A. L'Hégire", "B. La naissance de Mahomet", "C. La révélation du Coran", "D. La bataille de Badr"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel concile a défini les dogmes du christianisme au IVᵉ siècle ?",
+                    options: ["A. Concile de Nicée", "B. Concile de Trente", "C. Concile de Vatican II", "D. Concile de Constantinople"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel texte sacré est au cœur du judaïsme ?",
+                    options: ["A. La Torah", "B. La Bible", "C. Le Coran", "D. Les Védas"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel explorateur a été le premier à atteindre l'Inde par la mer en 1498 ?",
+                    options: ["A. Vasco de Gama", "B. Christophe Colomb", "C. Ferdinand Magellan", "D. Marco Polo"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel explorateur a réalisé le premier tour du monde entre 1519 et 1522 ?",
+                    options: ["A. Ferdinand Magellan", "B. Christophe Colomb", "C. Vasco de Gama", "D. James Cook"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel explorateur a atteint le pôle Sud en 1911 ?",
+                    options: ["A. Roald Amundsen", "B. Robert Falcon Scott", "C. Ernest Shackleton", "D. Richard Byrd"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel explorateur a été le premier à atteindre le sommet de l'Everest en 1953 ?",
+                    options: ["A. Edmund Hillary", "B. Tenzing Norgay", "C. Reinhold Messner", "D. Junko Tabei"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel événement a marqué le début de la Révolution américaine en 1775 ?",
+                    options: ["A. La bataille de Lexington et Concord", "B. La Déclaration d'indépendance", "C. La bataille de Yorktown", "D. Le Boston Tea Party"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel événement a marqué le début de la Révolution russe en 1917 ?",
+                    options: ["A. La révolution de Février", "B. La révolution d'Octobre", "C. La guerre civile russe", "D. L'assassinat du tsar Nicolas II"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel événement a marqué le début de la Révolution industrielle au XVIIIᵉ siècle ?",
+                    options: ["A. L'invention de la machine à vapeur", "B. La construction des chemins de fer", "C. La mécanisation de l'agriculture", "D. L'urbanisation massive"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel événement a marqué la fin de l'apartheid en Afrique du Sud en 1994 ?",
+                    options: ["A. L'élection de Nelson Mandela", "B. La libération de Nelson Mandela", "C. La fin des sanctions internationales", "D. La réforme constitutionnelle"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel événement a marqué la fin de la guerre du Vietnam en 1975 ?",
+                    options: ["A. La chute de Saïgon", "B. Les accords de Paris", "C. La bataille de Dien Bien Phu", "D. L'offensive du Têt"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel conflit a opposé les Alliés et les puissances de l'Axe ?",
+                    options: ["A. La guerre froide", "B. La Première Guerre mondiale", "C. La Seconde Guerre mondiale", "D. La guerre de Corée"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel conflit a opposé les États-Unis et l'Union soviétique de 1947 à 1991 ?",
+                    options: ["A. La guerre froide", "B. La guerre de Corée", "C. La guerre du Vietnam", "D. La guerre du Golfe"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel événement a marqué le début de la guerre du Golfe en 1990 ?",
+                    options: ["A. L'invasion du Koweït par l'Irak", "B. L'attaque de Pearl Harbor", "C. La chute du mur de Berlin", "D. La crise des missiles de Cuba"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel conflit a opposé les États-Unis et l'Irak en 2003 ?",
+                    options: ["A. La guerre d'Irak", "B. La guerre du Golfe", "C. La guerre d'Afghanistan", "D. La guerre de Corée"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel événement a marqué la découverte de la route maritime vers l'Inde en 1498 ?",
+                    options: ["A. Le voyage de Vasco de Gama", "B. Le voyage de Christophe Colomb", "C. Le voyage de Ferdinand Magellan", "D. Le voyage de Marco Polo"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel événement a marqué la découverte de l'Antarctique en 1820 ?",
+                    options: ["A. Le voyage de Fabian Gottlieb von Bellingshausen", "B. Le voyage de James Cook", "C. Le voyage de Roald Amundsen", "D. Le voyage de Robert Falcon Scott"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Qui a inventé l'ampoule électrique au XIXᵉ siècle ?",
+                    options: ["A. Thomas Edison", "B. Nikola Tesla", "C. Alexander Graham Bell", "D. Benjamin Franklin"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Qui a inventé le téléphone en 1876 ?",
+                    options: ["A. Alexander Graham Bell", "B. Thomas Edison", "C. Nikola Tesla", "D. Benjamin Franklin"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Qui a inventé l'avion en 1903 ?",
+                    options: ["A. Les frères Wright", "B. Louis Blériot", "C. Charles Lindbergh", "D. Amelia Earhart"],
+                    correctAnswer: "A"
+                },
+            ],
+            science: [
+                {
+                    question: "Quel est le nom de la loi qui dit que 'tout corps plongé dans un fluide subit une poussée verticale' ?",
+                    options: ["A. Loi de Newton", "B. Loi de Pascal", "C. Loi d'Archimède", "D. Loi de Coulomb"],
+                    correctAnswer: "C"
+                },
+                // ... (toutes les autres questions de science)
+                
+        {
+            question: "Quelle est l'unité de mesure de la force dans le système international ?",
+            options: ["A. Joule", "B. Newton", "C. Watt", "D. Pascal"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel physicien a découvert la radioactivité naturelle ?",
+            options: ["A. Marie Curie", "B. Albert Einstein", "C. Niels Bohr", "D. Ernest Rutherford"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quel phénomène explique pourquoi le ciel est bleu ?",
+            options: ["A. L'effet Doppler", "B. La diffusion Rayleigh", "C. La réflexion totale", "D. L'effet photoélectrique"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel élément chimique a pour symbole 'Na' ?",
+            options: ["A. Nickel", "B. Néon", "C. Sodium", "D. Azote"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le pH approximatif du vinaigre ?",
+            options: ["A. 1", "B. 3", "C. 7", "D. 9"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle réaction chimique produit de l'eau à partir d'hydrogène et d'oxygène ?",
+            options: ["A. Oxydation", "B. Combustion", "C. Synthèse", "D. Polymérisation"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le nom scientifique du processus de division cellulaire ?",
+            options: ["A. Osmose", "B. Mitose", "C. Méiose", "D. Cytokinèse"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Combien de paires de côtes possède un être humain normal ?",
+            options: ["A. 10", "B. 12", "C. 14", "D. 16"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel organe produit l'insuline dans le corps humain ?",
+            options: ["A. Le foie", "B. Le pancréas", "C. La rate", "D. Les reins"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle planète est surnommée 'l'étoile du berger' ?",
+            options: ["A. Mars", "B. Jupiter", "C. Vénus", "D. Saturne"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est la durée approximative d'une révolution de la Lune autour de la Terre ?",
+            options: ["A. 7 jours", "B. 27 jours", "C. 31 jours", "D. 365 jours"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel type d'étoile est notre Soleil ?",
+            options: ["A. Naine blanche", "B. Géante rouge", "C. Naine jaune", "D. Supergéante"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle vitamine est produite par la peau sous l'effet du soleil ?",
+            options: ["A. Vitamine A", "B. Vitamine C", "C. Vitamine D", "D. Vitamine K"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle partie du cerveau régule les fonctions vitales comme la respiration ?",
+            options: ["A. Cervelet", "B. Cortex", "C. Tronc cérébral", "D. Hypothalamus"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel pourcentage de la surface terrestre est recouvert d'eau ?",
+            options: ["A. Environ 30%", "B. Environ 50%", "C. Environ 70%", "D. Environ 90%"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le principal gaz à effet de serre produit par les activités humaines ?",
+            options: ["A. Méthane", "B. Dioxyde de carbone", "C. Ozone", "D. Protoxyde d'azote"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel composant est considéré comme le 'cerveau' d'un ordinateur ?",
+            options: ["A. GPU", "B. CPU", "C. RAM", "D. Disque dur"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle unité mesure la puissance d'un processeur ?",
+            options: ["A. Hertz", "B. Watt", "C. Volt", "D. Ohm"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Combien vaut π arrondi à deux décimales ?",
+            options: ["A. 3.12", "B. 3.14", "C. 3.16", "D. 3.18"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la racine carrée de 144 ?",
+            options: ["A. 10", "B. 12", "C. 14", "D. 16"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle loi physique énonce que 'Tout corps plongé dans un fluide subit une poussée verticale' ?",
+            options: ["A. Loi de Newton", "B. Loi de Pascal", "C. Loi d'Archimède", "D. Loi de Coulomb"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est la vitesse de la lumière dans le vide ?",
+            options: ["A. 300 km/s", "B. 3 000 km/s", "C. 30 000 km/s", "D. 300 000 km/s"],
+            correctAnswer: "D"
+        },
+        {
+            question: "Quel élément est le plus abondant dans l'atmosphère terrestre ?",
+            options: ["A. Oxygène", "B. Azote", "C. Hydrogène", "D. Dioxyde de carbone"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle maladie est causée par une carence en vitamine C ?",
+            options: ["A. Rachitisme", "B. Scorbut", "C. Béri-béri", "D. Anémie"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la plus grande planète du système solaire ?",
+            options: ["A. Terre", "B. Mars", "C. Jupiter", "D. Saturne"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel scientifique a formulé les lois du mouvement ?",
+            options: ["A. Galilée", "B. Einstein", "C. Newton", "D. Kepler"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le symbole chimique du fer ?",
+            options: ["A. Ir", "B. Fe", "C. Fr", "D. Fi"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel organe filtre le sang dans le corps humain ?",
+            options: ["A. Foie", "B. Poumon", "C. Rein", "D. Cœur"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est la formule chimique de l'eau ?",
+            options: ["A. HO", "B. H2O", "C. H2O2", "D. HO2"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle particule subatomique a une charge positive ?",
+            options: ["A. Électron", "B. Neutron", "C. Proton", "D. Positron"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle planète est connue pour ses anneaux ?",
+            options: ["A. Mars", "B. Vénus", "C. Jupiter", "D. Saturne"],
+            correctAnswer: "D"
+        },
+        {
+            question: "Quelle est la fonction principale des chloroplastes dans les cellules végétales ?",
+            options: ["A. Respiration", "B. Photosynthèse", "C. Reproduction", "D. Stockage"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel gaz est nécessaire à la respiration humaine ?",
+            options: ["A. Hydrogène", "B. Azote", "C. Oxygène", "D. Dioxyde de carbone"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est l'unité de base de l'information en informatique ?",
+            options: ["A. Byte", "B. Bit", "C. Octet", "D. Pixel"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle planète est la plus proche du Soleil ?",
+            options: ["A. Vénus", "B. Terre", "C. Mercure", "D. Mars"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le nom du processus par lequel les plantes perdent de l'eau ?",
+            options: ["A. Photosynthèse", "B. Transpiration", "C. Respiration", "D. Osmose"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la formule chimique du sel de table ?",
+            options: ["A. NaCl", "B. KCl", "C. CaCl2", "D. MgCl2"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quelle est la couleur de l'oxygène liquide ?",
+            options: ["A. Rouge", "B. Bleu", "C. Vert", "D. Jaune"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le plus grand os du corps humain ?",
+            options: ["A. Humérus", "B. Fémur", "C. Tibia", "D. Radius"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la principale source d'énergie des écosystèmes terrestres ?",
+            options: ["A. Le vent", "B. La pluie", "C. Le Soleil", "D. Les minéraux"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel scientifique a découvert la gravitation universelle ?",
+            options: ["A. Einstein", "B. Galilée", "C. Newton", "D. Copernic"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le gaz le plus léger ?",
+            options: ["A. Hélium", "B. Hydrogène", "C. Oxygène", "D. Azote"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la vitesse du son dans l'air à 20°C ?",
+            options: ["A. 343 m/s", "B. 1235 km/h", "C. 299 792 km/s", "D. 50 m/s"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quelle partie de la cellule contient l'ADN ?",
+            options: ["A. Cytoplasme", "B. Membrane", "C. Noyau", "D. Mitochondrie"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le nom du premier satellite artificiel envoyé dans l'espace ?",
+            options: ["A. Apollo 11", "B. Spoutnik 1", "C. Hubble", "D. Voyager 1"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la formule chimique du dioxyde de carbone ?",
+            options: ["A. CO", "B. CO2", "C. C2O", "D. CHO2"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la fonction principale des globules rouges ?",
+            options: ["A. Combattre les infections", "B. Transporter l'oxygène", "C. Coaguler le sang", "D. Produire des anticorps"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le point d'ébullition de l'eau à pression normale ?",
+            options: ["A. 90°C", "B. 100°C", "C. 110°C", "D. 120°C"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle planète est appelée 'la planète rouge' ?",
+            options: ["A. Vénus", "B. Mars", "C. Jupiter", "D. Saturne"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la plus grande lune de Jupiter ?",
+            options: ["A. Europe", "B. Io", "C. Ganymède", "D. Callisto"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le nom du processus de conversion du glucose en énergie ?",
+            options: ["A. Photosynthèse", "B. Respiration cellulaire", "C. Fermentation", "D. Osmose"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel élément chimique est essentiel pour la formation de l'hémoglobine ?",
+            options: ["A. Calcium", "B. Fer", "C. Sodium", "D. Potassium"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la formule chimique de l'ozone ?",
+            options: ["A. O2", "B. O3", "C. O4", "D. HO"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la fonction principale des globules blancs ?",
+            options: ["A. Transporter l'oxygène", "B. Coaguler le sang", "C. Défense immunitaire", "D. Produire des hormones"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le nom de la théorie expliquant l'origine de l'univers ?",
+            options: ["A. Théorie de l'évolution", "B. Théorie de la relativité", "C. Théorie du Big Bang", "D. Théorie des cordes"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est la planète la plus chaude du système solaire ?",
+            options: ["A. Mercure", "B. Vénus", "C. Mars", "D. Jupiter"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la plus grande glande du corps humain ?",
+            options: ["A. Pancréas", "B. Thyroïde", "C. Foie", "D. Hypophyse"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le nom du processus par lequel les plantes fabriquent leur nourriture ?",
+            options: ["A. Respiration", "B. Photosynthèse", "C. Transpiration", "D. Germination"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le symbole chimique de l'argent ?",
+            options: ["A. Ag", "B. Au", "C. Ar", "D. Al"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quelle est la durée moyenne d'une rotation complète de la Terre sur elle-même ?",
+            options: ["A. 12 heures", "B. 24 heures", "C. 30 heures", "D. 365 heures"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le nom du tube qui relie la bouche à l'estomac ?",
+            options: ["A. Trachée", "B. Œsophage", "C. Intestin", "D. Urètre"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la formule chimique du peroxyde d'hydrogène ?",
+            options: ["A. H2O", "B. HO", "C. H2O2", "D. HO2"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est la particule subatomique sans charge électrique ?",
+            options: ["A. Proton", "B. Électron", "C. Neutron", "D. Positron"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est la fonction principale des mitochondries ?",
+            options: ["A. Stockage", "B. Photosynthèse", "C. Production d'énergie", "D. Synthèse des protéines"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le nom du processus de division cellulaire qui produit des cellules sexuelles ?",
+            options: ["A. Mitose", "B. Méiose", "C. Cytokinèse", "D. Réplication"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la formule chimique de l'acide sulfurique ?",
+            options: ["A. HCl", "B. H2SO4", "C. HNO3", "D. H3PO4"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la planète avec le plus grand nombre d'anneaux ?",
+            options: ["A. Jupiter", "B. Saturne", "C. Uranus", "D. Neptune"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le nom du premier homme à avoir marché sur la Lune ?",
+            options: ["A. Yuri Gagarin", "B. Neil Armstrong", "C. Buzz Aldrin", "D. John Glenn"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la vitesse de rotation de la Terre à l'équateur ?",
+            options: ["A. 100 km/h", "B. 500 km/h", "C. 1000 km/h", "D. 1670 km/h"],
+            correctAnswer: "D"
+        },
+        {
+            question: "Quel est le nom du processus par lequel les roches se décomposent ?",
+            options: ["A. Érosion", "B. Sédimentation", "C. Météorisation", "D. Cristallisation"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est la formule chimique du méthane ?",
+            options: ["A. CH4", "B. C2H6", "C. CO2", "D. H2O"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quel est le nom de la couche protectrice de la Terre qui absorbe les UV ?",
+            options: ["A. Ionosphère", "B. Stratosphère", "C. Couche d'ozone", "D. Mésosphère"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est la durée moyenne d'une révolution de Mars autour du Soleil ?",
+            options: ["A. 365 jours", "B. 500 jours", "C. 687 jours", "D. 1000 jours"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le nom du processus de formation des gamètes mâles ?",
+            options: ["A. Ovogenèse", "B. Spermatogenèse", "C. Mitose", "D. Méiose"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la formule chimique de l'ammoniac ?",
+            options: ["A. NH3", "B. NH4", "C. NO2", "D. N2O"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quelle est la plus grande structure du système solaire ?",
+            options: ["A. Le Soleil", "B. Jupiter", "C. La ceinture d'astéroïdes", "D. Le nuage d'Oort"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quel est le nom du processus de formation des étoiles ?",
+            options: ["A. Nucléosynthèse", "B. Accrétion", "C. Effondrement gravitationnel", "D. Fusion nucléaire"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est la formule chimique du glucose ?",
+            options: ["A. C6H12O6", "B. C12H22O11", "C. CH4", "D. CO2"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quel est le nom de la théorie expliquant la formation des espèces ?",
+            options: ["A. Théorie cellulaire", "B. Théorie de la relativité", "C. Théorie de l'évolution", "D. Théorie atomique"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est la planète avec les vents les plus rapides ?",
+            options: ["A. Jupiter", "B. Saturne", "C. Neptune", "D. Uranus"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le nom du processus de conversion de l'énergie lumineuse en énergie chimique ?",
+            options: ["A. Respiration", "B. Photosynthèse", "C. Fermentation", "D. Oxydation"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la formule chimique du propane ?",
+            options: ["A. CH4", "B. C2H6", "C. C3H8", "D. C4H10"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le nom de la force qui maintient les planètes en orbite autour du Soleil ?",
+            options: ["A. Force électromagnétique", "B. Force nucléaire forte", "C. Gravitation", "D. Force centrifuge"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est la température approximative du noyau terrestre ?",
+            options: ["A. 1000°C", "B. 3000°C", "C. 5000°C", "D. 7000°C"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le nom du processus de formation des roches à partir du magma ?",
+            options: ["A. Sédimentation", "B. Métamorphisme", "C. Cristallisation", "D. Érosion"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est la formule chimique de l'acide chlorhydrique ?",
+            options: ["A. HCl", "B. H2SO4", "C. HNO3", "D. H3PO4"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quel est le nom de la plus grande lune de Saturne ?",
+            options: ["A. Titan", "B. Encelade", "C. Mimas", "D. Rhéa"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quelle est la fonction principale des ribosomes ?",
+            options: ["A. Synthèse des protéines", "B. Production d'énergie", "C. Stockage", "D. Transport"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quel est le nom du processus de formation des montagnes ?",
+            options: ["A. Érosion", "B. Orogenèse", "C. Sédimentation", "D. Subduction"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la formule chimique de l'éthanol ?",
+            options: ["A. CH3OH", "B. C2H5OH", "C. C3H7OH", "D. C4H9OH"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le nom de la théorie décrivant le comportement des particules subatomiques ?",
+            options: ["A. Théorie de la relativité", "B. Mécanique quantique", "C. Théorie des cordes", "D. Théorie du chaos"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la planète avec le jour le plus long (rotation la plus lente) ?",
+            options: ["A. Mercure", "B. Vénus", "C. Terre", "D. Mars"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le nom du processus de formation des cellules sanguines ?",
+            options: ["A. Hématopoïèse", "B. Hémostase", "C. Phagocytose", "D. Mitose"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quelle est la formule chimique du dioxyde de soufre ?",
+            options: ["A. SO", "B. SO2", "C. SO3", "D. S2O"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le nom de la galaxie la plus proche de la Voie Lactée ?",
+            options: ["A. Andromède", "B. Triangle", "C. Grand Nuage de Magellan", "D. Sombrero"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quelle est la fonction principale des enzymes ?",
+            options: ["A. Transport", "B. Catalyse", "C. Structure", "D. Stockage"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le nom du processus de formation des nuages ?",
+            options: ["A. Condensation", "B. Évaporation", "C. Sublimation", "D. Précipitation"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quelle est la formule chimique du nitrate de potassium ?",
+            options: ["A. KNO2", "B. KNO3", "C. K2NO3", "D. K3NO4"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le nom de la théorie expliquant la formation de la Lune ?",
+            options: ["A. Théorie de la capture", "B. Théorie de la fission", "C. Théorie de l'impact géant", "D. Théorie de la co-formation"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est la planète avec le plus grand nombre de lunes ?",
+            options: ["A. Jupiter", "B. Saturne", "C. Uranus", "D. Neptune"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le nom du processus de formation des os ?",
+            options: ["A. Ossification", "B. Calcification", "C. Minéralisation", "D. Cristallisation"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quelle est la formule chimique du sulfate de cuivre ?",
+            options: ["A. CuSO3", "B. CuSO4", "C. Cu2SO4", "D. Cu(SO4)2"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le nom de la réaction nucléaire qui alimente le Soleil ?",
+            options: ["A. Fission", "B. Fusion", "C. Désintégration", "D. Transmutation"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la plus grande structure vivante sur Terre ?",
+            options: ["A. Séquoia géant", "B. Grande Barrière de corail", "C. Réseau fongique", "D. Forêt amazonienne"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le nom du processus de formation des spermatozoïdes ?",
+            options: ["A. Ovogenèse", "B. Spermatogenèse", "C. Méiose", "D. Mitose"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la formule chimique du phosphate de calcium ?",
+            options: ["A. CaPO4", "B. Ca2PO4", "C. Ca3(PO4)2", "D. Ca(PO4)3"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le nom de la couche la plus externe de la Terre ?",
+            options: ["A. Noyau", "B. Manteau", "C. Croûte", "D. Lithosphère"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est la vitesse de la lumière dans le vide ?",
+            options: ["A. 300 000 m/s", "B. 300 000 km/s", "C. 3 000 000 m/s", "D. 3 000 000 km/s"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le nom du processus de formation des roches sédimentaires ?",
+            options: ["A. Cristallisation", "B. Solidification", "C. Lithification", "D. Métamorphisme"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quelle est la formule chimique de l'acide acétique ?",
+            options: ["A. CH3COOH", "B. H2SO4", "C. HCl", "D. HNO3"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quel est le nom de la théorie expliquant le mouvement des continents ?",
+            options: ["A. Théorie des plaques", "B. Théorie de la dérive des continents", "C. Théorie de l'expansion océanique", "D. Théorie de la subduction"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la planète la plus dense du système solaire ?",
+            options: ["A. Mercure", "B. Vénus", "C. Terre", "D. Mars"],
+            correctAnswer: "C"
+        },
+        {
+            question: "Quel est le nom du processus de formation des gamètes femelles ?",
+            options: ["A. Spermatogenèse", "B. Ovogenèse", "C. Méiose", "D. Mitose"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la formule chimique du carbonate de calcium ?",
+            options: ["A. CaCO2", "B. CaCO3", "C. Ca2CO3", "D. Ca(CO3)2"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le nom de la couche atmosphérique où se produit la météo ?",
+            options: ["A. Troposphère", "B. Stratosphère", "C. Mésosphère", "D. Thermosphère"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quelle est la température approximative de la surface du Soleil ?",
+            options: ["A. 1000°C", "B. 5500°C", "C. 10 000°C", "D. 15 000°C"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quel est le nom du processus de formation des minéraux ?",
+            options: ["A. Cristallisation", "B. Solidification", "C. Liquéfaction", "D. Sublimation"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quelle est la formule chimique de l'hydroxyde de sodium ?",
+            options: ["A. NaOH", "B. Na2O", "C. NaH", "D. Na(OH)2"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quel est le nom de la théorie expliquant l'extinction des dinosaures ?",
+            options: ["A. Théorie de l'impact", "B. Théorie volcanique", "C. Théorie climatique", "D. Théorie de la maladie"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quelle est la planète avec l'orbite la plus excentrique ?",
+            options: ["A. Mercure", "B. Vénus", "C. Terre", "D. Mars"],
+            correctAnswer: "A"
+        },
+        {
+            question: "Quel est le nom du processus de formation des cellules ?",
+            options: ["A. Cytogenèse", "B. Cytokinèse", "C. Mitose", "D. Méiose"],
+            correctAnswer: "B"
+        },
+        {
+            question: "Quelle est la formule chimique du nitrate d'argent ?",
+            options: ["A. AgNO2", "B. AgNO3", "C. Ag2NO3", "D. Ag(NO3)2"],
+            correctAnswer: "B"
+        }
+
+         ],
+
+         sport: [
+            
+                {
+                    question: "En quelle année les Jeux Olympiques ont-ils eu lieu à Paris ?",
+                    options: ["A. 1900", "B. 1924", "C. Les deux", "D. Jamais"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel sport pratique Tiger Woods ?",
+                    options: ["A. Tennis", "B. Golf", "C. Football américain", "D. Basket-ball"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Combien de joueurs composent une équipe de rugby sur le terrain ?",
+                    options: ["A. 11", "B. 13", "C. 15", "D. 7"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel pays a remporté le premier Mondial de football en 1930 ?",
+                    options: ["A. Uruguay", "B. Argentine", "C. Brésil", "D. Italie"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel nageur a remporté le plus de médailles olympiques ?",
+                    options: ["A. Michael Phelps", "B. Mark Spitz", "C. Ian Thorpe", "D. Ryan Lochte"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel sport est associé à Wimbledon ?",
+                    options: ["A. Golf", "B. Tennis", "C. Cricket", "D. Rugby"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel pays a inventé le basketball ?",
+                    options: ["A. Canada", "B. États-Unis", "C. Royaume-Uni", "D. France"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le sport national du Canada ?",
+                    options: ["A. Hockey sur glace", "B. Basketball", "C. Football", "D. Baseball"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Combien de joueurs composent une équipe de baseball sur le terrain ?",
+                    options: ["A. 7", "B. 9", "C. 11", "D. 13"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel pays a remporté la Coupe du Monde de Rugby 2019 ?",
+                    options: ["A. Nouvelle-Zélande", "B. Afrique du Sud", "C. Angleterre", "D. Australie"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le plus long tournoi du Grand Chelem de tennis ?",
+                    options: ["A. Roland-Garros", "B. Wimbledon", "C. US Open", "D. Open d'Australie"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel sportif est surnommé 'The Great One' ?",
+                    options: ["A. Michael Jordan", "B. Wayne Gretzky", "C. Muhammad Ali", "D. Tiger Woods"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quelle nation a remporté le plus de médailles aux JO d'hiver ?",
+                    options: ["A. Norvège", "B. États-Unis", "C. Allemagne", "D. Russie"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays a remporté le plus de Tournois des Six Nations ?",
+                    options: ["A. Angleterre", "B. France", "C. Pays de Galles", "D. Irlande"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel joueur a marqué le plus de buts en une seule édition de Coupe du Monde ?",
+                    options: ["A. Pelé", "B.Nazario Ronaldo", "C. Miroslav Klose", "D. Lionel Messi"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quelle ville accueille le marathon le plus ancien ?",
+                    options: ["A. New York", "B. Berlin", "C. Boston", "D. Paris"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel sport utilise une 'chistera' ?",
+                    options: ["A. Pelote basque", "B. Cricket", "C. Hockey", "D. Tennis"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe Davis ?",
+                    options: ["A. États-Unis", "B. Tonga", "C. France", "D. Nigéria"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le sport le plus populaire en Inde ?",
+                    options: ["A. Football", "B. Cricket", "C. Hockey", "D. Tennis"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Combien de joueurs composent une équipe de volley-ball ?",
+                    options: ["A. 5", "B. 8", "C. 7", "D. 6"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel pays a remporté le plus de médailles d'or aux JO 2020 ?",
+                    options: ["A. Chine", "B. États-Unis", "C. Japon", "D. Grande-Bretagne"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel sportif a remporté le plus de titres du Grand Chelem ?",
+                    options: ["A. Roger Federer", "B. Rafael Nadal", "C. Novak Djokovic", "D. Margaret Court"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel cycliste a remporté le plus de Tours de France ?",
+                    options: ["A. Eddy Merckx", "B. Lance Armstrong", "C. Miguel Indurain", "D. Jacques Anquetil"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays a remporté le premier Mondial de basket-ball ?",
+                    options: ["A. États-Unis", "B. Argentine", "C. URSS", "D. Yougoslavie"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel sport est associé à la Ryder Cup ?",
+                    options: ["A. Golf", "B. Tennis", "C. Rugby", "D. Cricket"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel Club de football a remporté le plus de Ligue des Champions ?",
+                    options: ["A. Real Madrid", "B. Bayern Munich", "C. AC Milan", "D. Barcelone"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le seul pays à avoir participé à toutes les Coupes du Monde ?",
+                    options: ["A. Brésil", "B. Allemagne", "C. Italie", "D. Argentine"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel sportif est surnommé 'King James' ?",
+                    options: ["A. LeBron James", "B. James Harden", "C. James Rodriguez", "D. James Bond"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quelle franchise a remportée le plus de titres en NBA ?",
+                    options: ["A. Los Angeles Lakers", "B. Boston Celtics", "C. Chicago Bulls", "D. Golden State Warriors"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le sport national du Japon ?",
+                    options: ["A. Judo", "B. Sumo", "C. Baseball", "D. Football"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel joueur a marqué le plus de points en NBA ?",
+                    options: ["A. Kareem Abdul-Jabbar", "B. LeBron James", "C. Kobe Bryant", "D. Michael Jordan"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "J'ai joué avec et contre Léo Messi et Cristiano Ronaldo,aujourd'hui je porte le numéro 93 dans un club mexicain qui suis-je?",
+                    options: ["A. Angel Di Maria", "B. Sergio Ramos", "C. Paulo Di Bala", "D. Nelson Semedo"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel sport est associé à la Coupe Stanley ?",
+                    options: ["A. Hockey sur glace", "B. Football", "C. Rugby", "D. Basket-ball"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe du Monde Féminine ?",
+                    options: ["A. États-Unis", "B. Allemagne", "C. Norvège", "D. Japon"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le seul quintuple champion du monde de Formule 1 ?",
+                    options: ["A. Michael Schumacher", "B. Lewis Hamilton", "C. Juan Manuel Fangio", "D. Sebastian Vettel"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel pays a remporté le plus de médailles en natation aux JO ?",
+                    options: ["A. États-Unis", "B. Australie", "C. Allemagne", "D. Chine"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel sport est associé au Masters ?",
+                    options: ["A. Golf", "B. Tennis", "C. Snooker", "D. Badminton"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Je suis un footbaleur maroco-espagnol je célèbre mes buts en faisant le signe des doigts `304` qui suis-je ?",
+                    options: ["A. Assane Dio", "B. Inaki Williams", "C. Lamine Yamal", "D. Eze Abde"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel est le sport le plus populaire aux États-Unis ?",
+                    options: ["A. Football américain", "B. Basket-ball", "C. Baseball", "D. Hockey"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe du Monde de cricket ?",
+                    options: ["A. Australie", "B. Inde", "C. Angleterre", "D. Pakistan"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le seul boxeur invaincu en carrière ?",
+                    options: ["A. Muhammad Ali", "B. Mike Tyson", "C. Floyd Mayweather", "D. Rocky Marciano"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe du Monde de rugby à 7 ?",
+                    options: ["A. Nouvelle-Zélande", "B. Fidji", "C. Afrique du Sud", "D. France"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le sport national de la Corée du Sud ?",
+                    options: ["A. Taekwondo", "B. Judo", "C. Sumo", "D. Karaté"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel joueur a remporté le plus de titres du Grand Chelem en simple masculin ?",
+                    options: ["A. Roger Federer", "B. Rafael Nadal", "C. Novak Djokovic", "D. Pete Sampras"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Championnat du Monde de handball ?",
+                    options: ["A. France", "B. Danemark", "C. Espagne", "D. Suède"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le sport le plus populaire au Brésil ?",
+                    options: ["A. Football", "B. Volley-ball", "C. Basketball", "D. Tennis"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe du Monde de ski alpin ?",
+                    options: ["A. Autriche", "B. Suisse", "C. France", "D. Norvège"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le seul golfeur à avoir remporté les 4 Majeurs la même année ?",
+                    options: ["A. Tiger Woods", "B. Jack Nicklaus", "C. Bobby Jones", "D. Ben Hogan"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Championnat du Monde de cyclisme sur route ?",
+                    options: ["A. Italie", "B. Belgique", "C. France", "D. Espagne"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le sport national de l'Australie ?",
+                    options: ["A. Cricket", "B. Rugby", "C. Football australien", "D. Tennis"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel joueur a marqué le plus de buts en une saison de Ligue 1 ?",
+                    options: ["A. Kylian Mbappé", "B. Zlatan Ibrahimović", "C. Josip Skoblar", "D. Carlos Bianchi"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe du Monde de badminton ?",
+                    options: ["A. Chine", "B. Indonésie", "C. Danemark", "D. Corée du Sud"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le seul nageur à avoir battu un record du monde dans 8 disciplines différentes ?",
+                    options: ["A. Michael Phelps", "B. Ryan Lochte", "C. Ian Thorpe", "D. Mark Spitz"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Championnat du Monde de gymnastique ?",
+                    options: ["A. Russie", "B. Chine", "C. Japon", "D. États-Unis"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le sport le plus populaire en Chine ?",
+                    options: ["A. Ping-pong", "B. Badminton", "C. Basketball", "D. Football"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel joueur a remporté le plus de titres en Grand Chelem en double ?",
+                    options: ["A. Mike Bryan", "B. Bob Bryan", "C. Daniel Nestor", "D. Todd Woodbridge"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe du Monde de hockey sur gazon ?",
+                    options: ["A. Pakistan", "B. Australie", "C. Pays-Bas", "D. Allemagne"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le seul joueur à avoir marqué dans 6 matchs différents d'une même Coupe du Monde ?",
+                    options: ["A. Just Fontaine", "B. Pelé", "C. Gerd Müller", "D. Ronaldo"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Championnat du Monde d'athlétisme ?",
+                    options: ["A. États-Unis", "B. Kenya", "C. Jamaïque", "D. Russie"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le sport national de la Nouvelle-Zélande ?",
+                    options: ["A. Rugby", "B. Cricket", "C. Netball", "D. Football"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel joueur a marqué le plus de paniers à 3 points en NBA ?",
+                    options: ["A. Klay Thompson", "B. Ray Allen", "C. Reggie Miller", "D. Stephen Curry"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe du Monde de snowboard ?",
+                    options: ["A. États-Unis", "B. France", "C. Suisse", "D. Canada"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le seul joueur à avoir remporté 4 médailles d'or en tennis aux JO ?",
+                    options: ["A. Andy Murray", "B. Rafael Nadal", "C. Roger Federer", "D. Venus Williams"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Championnat du Monde de judo ?",
+                    options: ["A. Japon", "B. France", "C. Corée du Sud", "D. Brésil"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel joueur a le plus remporté de Ballon d'or France Football ?",
+                    options: ["A. Yohan Cruff", "B. Lionnel Messi", "C. Cristiano Ronaldo", "D. Zinédine Zidane"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel joueur a remporté le plus de titres en Masters 1000 ?",
+                    options: ["A. Rafael Nadal", "B. Novak Djokovic", "C. Roger Federer", "D. Andy Murray"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe du Monde de surf ?",
+                    options: ["A. Australie", "B. États-Unis", "C. Brésil", "D. Afrique du Sud"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le seul athlète à avoir remporté l'or aux JO en saut en longueur 4 fois de suite ?",
+                    options: ["A. Carl Lewis", "B. Jesse Owens", "C. Bob Beamon", "D. Mike Powell"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Championnat du Monde de boxe amateur ?",
+                    options: ["A.  Kazakhstan", "B. États-Unis", "C. Russie", "D. Cuba"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Je suis hauteur d'un quintuplé en ligue des  champions qui suis-je?",
+                    options: ["A. Erling Haaland", "B. Lionnel Messi", "C. Les deux", "D. Aucun"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel joueur a marqué le plus de buts en une saison de Premier League ?",
+                    options: ["A. Alan Shearer", "B. Thierry Henry", "C. Mohamed Salah", "D. Erling Haaland"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe du Monde de triathlon ?",
+                    options: ["A. Espagne", "B. Suisse", "C. Australie", "D. Nouvelle-Zélande"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le seul golfeur à avoir remporté le Grand Chelem de carrière ?",
+                    options: ["A. Tiger Woods", "B. Jack Nicklaus", "C. Gary Player", "D. Gene Sarazen"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Championnat du Monde d'escrime ?",
+                    options: ["A. France", "B. Italie", "C. Hongrie", "D. Russie"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le sport le plus populaire en Russie ?",
+                    options: ["A. Football", "B. Hockey sur glace", "C. Basketball", "D. Tennis"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Qui est le meilleur buteur dans l'histoire du PSG ?",
+                    options: ["A. Paul Weah", "B. Edison Cavani", "C. Kylian Mbappe", "D. Blaise Matudi"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe du Monde de ski de fond ?",
+                    options: ["A. Norvège", "B. Suède", "C. Finlande", "D. Russie"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le seul joueur à avoir marqué 100 buts en Premier League pour deux clubs différents ?",
+                    options: ["A. Harry Kane", "B. Wayne Rooney", "C. Sergio Agüero", "D. Alan Shearer"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Championnat du Monde de natation ?",
+                    options: ["A. États-Unis", "B. Chine", "C. Australie", "D. Russie"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le sport national de l'Afrique du Sud ?",
+                    options: ["A. Football", "B. Rugby", "C. Cricket", "D. Golf"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel joueur a marqué le plus de buts en une saison de Bundesliga ?",
+                    options: ["A. Gerd Müller", "B. Robert Lewandowski", "C. Klaus Fischer", "D. Jupp Heynckes"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe du Monde de biathlon ?",
+                    options: ["A. Norvège", "B. Allemagne", "C. France", "D. Russie"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le seul athlète à avoir remporté l'or aux JO en 100m et 200m 3 fois de suite ?",
+                    options: ["A. Usain Bolt", "B. Carl Lewis", "C. Jesse Owens", "D. Maurice Greene"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Championnat du Monde de canoë-kayak ?",
+                    options: ["A. Hongrie", "B. Allemagne", "C. Russie", "D. France"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel joueur est vainqueur du dernier Ballon d'Or Africain ?",
+                    options: ["A. Victor Oshimen", "B. Seydou Guirrasy", "C. Ademola Lookman", "D. Mohamed Salah"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel joueur a remporté le plus de titres en WTA ?",
+                    options: ["A. Serena Williams", "B. Steffi Graf", "C. Martina Navratilova", "D. Chris Evert"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe du Monde de saut à ski ?",
+                    options: ["A. Autriche", "B. Finlande", "C. Norvège", "D. Allemagne"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le seul joueur à avoir marqué dans 11 matchs consécutifs de Ligue des Champions ?",
+                    options: ["A. Cristiano Ronaldo", "B. Lionel Messi", "C. Ruud van Nistelrooy", "D. Robert Lewandowski"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Championnat du Monde de haltérophilie ?",
+                    options: ["A. Chine", "B. Russie", "C. Iran", "D. Turquie"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le sport national du Pakistan ?",
+                    options: ["A. Cricket", "B. Hockey sur gazon", "C. Football", "D. Squash"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel joueur a marqué le plus de buts en une saison de Serie A ?",
+                    options: ["A. Gonzalo Higuaín", "B. Gunnar Nordahl", "C. Silvio Piola", "D. Giuseppe Meazza"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe du Monde de patinage artistique ?",
+                    options: ["A. Russie", "B. États-Unis", "C. Canada", "D. Japon"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le seul athlète à avoir remporté l'or aux JO en saut à la perche 4 fois de suite ?",
+                    options: ["A. Sergey Bubka", "B. Renaud Lavillenie", "C. Mondo Duplantis", "D. Bob Richards"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Championnat du Monde de taekwondo ?",
+                    options: ["A. Corée du Sud", "B. Iran", "C. Turquie", "D. Chine"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "J'ai marqué 91 buts sur une année civile qui suis-je ?",
+                    options: ["A. Lionnel Messi", "B. Maradona", "C. Ousmane Dembelé", "D. Robert Lewandoski"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel joueur a remporté le plus de titres en ATP ?",
+                    options: ["A. Roger Federer", "B. Rafael Nadal", "C. Novak Djokovic", "D. Jimmy Connors"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe du Monde de voile ?",
+                    options: ["A. Nouvelle-Zélande", "B. États-Unis", "C. Royaume-Uni", "D. Australie"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Combien de fois d'affilée Manchester fût champion d'Anglettere lors des 10 dernières années ?",
+                    options: ["A. 4", "B. 3", "C. 6", "D. Jamais"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Championnat du Monde de tir à l'arc ?",
+                    options: ["A. Corée du Sud", "B. États-Unis", "C. France", "D. Italie"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Qui était le meilleur gardien de but lors de la dernière édition coupe du monde de football ?",
+                    options: ["A. Manuel Nuer", "B. Hugo Lloris", "C. Allison Becker", "D. Emiliano Martinez"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel joueur a marqué le plus de buts en une saison de Liga ?",
+                    options: ["A. Lionel Messi", "B. Cristiano Ronaldo", "C. Telmo Zarra", "D. Hugo Sánchez"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Coupe du Monde de pentathlon moderne ?",
+                    options: ["A. Russie", "B. Hongrie", "C. Suède", "D. Pologne"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le seul athlète à avoir remporté l'or aux JO en décathlon 2 fois de suite ?",
+                    options: ["A. Roman Šebrle", "B. Ashton Eaton", "C. Daley Thompson", "D. Bryan Clay"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel pays a remporté le plus de titres en Championnat du Monde de lutte ?",
+                    options: ["A. Turquie", "B. Iran", "C. États-Unis", "D. Russie"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Le Togo a gagné combien de Coupe d'Afrique des Nations ?",
+                    options: ["A. 7", "B. 4", "C. 2", "D. Aucun"],
+                    correctAnswer: "D"
+                }
+                ],
+
+
+         music: [
+                {
+                    question: "Quel artiste est connu comme le 'King of Pop' ?",
+                    options: ["A. Michael Jackson", "B. Prince", "C. Elvis Presley", "D. Justin Timberlake"],
+                    correctAnswer: "A"
+                },
+
+                {
+                    question: "Quel artiste est connu comme le 'King of Pop' ?",
+                    options: ["A. Michael Jackson", "B. Prince", "C. Elvis Presley", "D. Justin Timberlake"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel groupe britannique est considéré comme le plus influent de l'histoire du rock ?",
+                    options: ["A. The Rolling Stones", "B. The Beatles", "C. Queen", "D. Led Zeppelin"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel instrument de musique est associé à Yo-Yo Ma ?",
+                    options: ["A. Violon", "B. Violoncelle", "C. Contrebasse", "D. Alto"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel compositeur classique était sourd à la fin de sa vie ?",
+                    options: ["A. Mozart", "B. Bach", "C. Beethoven", "D. Chopin"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel genre musical est originaire de Jamaïque ?",
+                    options: ["A. Salsa", "B. Reggae", "C. Hip-hop", "D. Jazz"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quelle chanteuse est surnommée 'Queen of Soul' ?",
+                    options: ["A. Whitney Houston", "B. Mariah Carey", "C. Aretha Franklin", "D. Diana Ross"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel groupe a sorti l'album 'The Dark Side of the Moon' ?",
+                    options: ["A. Pink Floyd", "B. The Doors", "C. Genesis", "D. Jethro Tull"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle brésilienne associée au carnaval ?",
+                    options: ["A. Tango", "B. Samba", "C. Bossa nova", "D. Forró"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel artiste a vendu le plus d'albums de tous les temps ?",
+                    options: ["A. Elvis Presley", "B. The Beatles", "C. Michael Jackson", "D. Madonna"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel instrument joue Kenny G ?",
+                    options: ["A. Trompette", "B. Saxophone", "C. Flûte", "D. Clarinette"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel compositeur a écrit 'Les Quatre Saisons' ?",
+                    options: ["A. Vivaldi", "B. Mozart", "C. Bach", "D. Handel"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'grunge' dans les années 90 ?",
+                    options: ["A. Pearl Jam", "B. Soundgarden", "C. Alice in Chains", "D. Nirvana"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quelle ville est considérée comme le berceau du jazz ?",
+                    options: ["A. Chicago", "B. New York", "C. La Nouvelle-Orléans", "D. Memphis"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel artiste français est connu comme 'Le Petit Prince de la chanson' ?",
+                    options: ["A. Serge Gainsbourg", "B. Jacques Brel", "C. Charles Aznavour", "D. Georges Brassens"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom du festival de musique le plus célèbre aux États-Unis ?",
+                    options: ["A. Lollapalooza", "B. Coachella", "C. Woodstock", "D. Glastonbury"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel instrument est associé à Andrés Segovia ?",
+                    options: ["A. Piano", "B. Guitare classique", "C. Violon", "D. Harpe"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel groupe suédois a dominé les charts dans les années 70-80 avec des tubes comme 'Dancing Queen' ?",
+                    options: ["A. Roxette", "B. Ace of Base", "C. ABBA", "D. Europe"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel genre musical est caractérisé par des basses lourdes et des paroles rappées ?",
+                    options: ["A. Techno", "B. Hip-hop", "C. Dubstep", "D. R&B"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel compositeur a écrit 'La Flûte enchantée' ?",
+                    options: ["A. Beethoven", "B. Mozart", "C. Haydn", "D. Schubert"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel artiste a sorti l'album 'Thriller' en 1982 ?",
+                    options: ["A. Prince", "B. Michael Jackson", "C. Stevie Wonder", "D. George Michael"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle argentine ?",
+                    options: ["A. Samba", "B. Tango", "C. Flamenco", "D. Rumba"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'heavy metal' avec des albums comme 'Paranoid' ?",
+                    options: ["A. Iron Maiden", "B. Judas Priest", "C. Black Sabbath", "D. Metallica"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel instrument joue Miles Davis ?",
+                    options: ["A. Saxophone", "B. Trompette", "C. Trombone", "D. Clarinette"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel artiste est connu comme le 'Roi du Rock and Roll' ?",
+                    options: ["A. Chuck Berry", "B. Little Richard", "C. Elvis Presley", "D. Jerry Lee Lewis"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel est le nom du célèbre opéra de Bizet situé en Espagne ?",
+                    options: ["A. La Traviata", "B. Carmen", "C. Aida", "D. Tosca"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel genre musical est originaire de la République Démocratique du Congo ?",
+                    options: ["A. Highlife", "B. Soukous", "C. Afrobeat", "D. Makossa"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel groupe a sorti 'Bohemian Rhapsody' en 1975 ?",
+                    options: ["A. Led Zeppelin", "B. Pink Floyd", "C. Queen", "D. The Who"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle irlandaise ?",
+                    options: ["A. Flamenco", "B. Celtic", "C. Bluegrass", "D. Zydeco"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel artiste a popularisé le style 'fado' au Portugal ?",
+                    options: ["A. Cesária Évora", "B. Amália Rodrigues", "C. Mariza", "D. Dulce Pontes"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel compositeur a écrit 'Le Lac des cygnes' ?",
+                    options: ["A. Tchaïkovski", "B. Stravinsky", "C. Prokofiev", "D. Chostakovitch"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel groupe français est connu pour 'Désenchantée' et 'Ma Liberté' ?",
+                    options: ["A. Téléphone", "B. Indochine", "C. Noir Désir", "D. Trust"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle hawaïenne ?",
+                    options: ["A. Reggae", "B. Hula", "C. Slack-key", "D. Calypso"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel artiste est connu comme le 'Godfather of Soul' ?",
+                    options: ["A. Ray Charles", "B. James Brown", "C. Stevie Wonder", "D. Marvin Gaye"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel groupe a popularisé le mouvement 'punk' dans les années 70 ?",
+                    options: ["A. The Clash", "B. Sex Pistols", "C. Ramones", "D. The Damned"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle indienne ?",
+                    options: ["A. K-pop", "B. Bollywood", "C. Raga", "D. Bhangra"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel artiste a sorti l'album 'Blue' en 1971 ?",
+                    options: ["A. Carole King", "B. Joni Mitchell", "C. Joan Baez", "D. Janis Joplin"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle cubaine ?",
+                    options: ["A. Salsa", "B. Son", "C. Mambo", "D. Cha-cha-cha"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'disco' avec 'Stayin' Alive' ?",
+                    options: ["A. Chic", "B. Bee Gees", "C. KC and the Sunshine Band", "D. Village People"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle écossaise ?",
+                    options: ["A. Jig", "B. Reel", "C. Strathspey", "D. Ceilidh"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The Boss' ?",
+                    options: ["A. Bruce Springsteen", "B. Billy Joel", "C. Bob Seger", "D. Tom Petty"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle mexicaine ?",
+                    options: ["A. Tango", "B. Mariachi", "C. Ranchera", "D. Corrido"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'new wave' avec 'Sweet Dreams' ?",
+                    options: ["A. Depeche Mode", "B. The Cure", "C. Eurythmics", "D. Duran Duran"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle russe ?",
+                    options: ["A. Polka", "B. Balalaika", "C. Troïka", "D. Kalinka"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel artiste a popularisé le 'scat singing' en jazz ?",
+                    options: ["A. Louis Armstrong", "B. Ella Fitzgerald", "C. Billie Holiday", "D. Nina Simone"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle japonaise ?",
+                    options: ["A. Koto", "B. Shakuhachi", "C. Gagaku", "D. Enka"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'hard rock' avec 'Highway to Hell' ?",
+                    options: ["A. Led Zeppelin", "B. Deep Purple", "C. AC/DC", "D. Guns N' Roses"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle grecque ?",
+                    options: ["A. Sirtaki", "B. Bouzouki", "C. Rebetiko", "D. Hasapiko"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The Voice' ?",
+                    options: ["A. Whitney Houston", "B. Mariah Carey", "C. Celine Dion", "D. Barbra Streisand"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle coréenne ?",
+                    options: ["A. K-pop", "B. Trot", "C. Pansori", "D. Gugak"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'progressive rock' avec 'The Wall' ?",
+                    options: ["A. Genesis", "B. Yes", "C. Pink Floyd", "D. King Crimson"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle sud-africaine ?",
+                    options: ["A. Kwaito", "B. Mbaqanga", "C. Isicathamiya", "D. Afrobeat"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The Piano Man' ?",
+                    options: ["A. Elton John", "B. Billy Joel", "C. Stevie Wonder", "D. Ray Charles"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle arabe ?",
+                    options: ["A. Raï", "B. Chaabi", "C. Maqam", "D. Gnawa"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'glam rock' avec 'Ziggy Stardust' ?",
+                    options: ["A. T. Rex", "B. Roxy Music", "C. David Bowie", "D. Queen"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle turque ?",
+                    options: ["A. Arabesque", "B. Fasıl", "C. Türkü", "D. Sufi"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The Material Girl' ?",
+                    options: ["A. Madonna", "B. Cher", "C. Cyndi Lauper", "D. Janet Jackson"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle péruvienne ?",
+                    options: ["A. Huayno", "B. Cumbia", "C. Saya", "D. Marinera"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'grunge' avec 'Nevermind' ?",
+                    options: ["A. Pearl Jam", "B. Soundgarden", "C. Alice in Chains", "D. Nirvana"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle hongroise ?",
+                    options: ["A. Csárdás", "B. Polka", "C. Mazurka", "D. Waltz"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The Queen of Pop' ?",
+                    options: ["A. Madonna", "B. Britney Spears", "C. Lady Gaga", "D. Beyoncé"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle colombienne ?",
+                    options: ["A. Salsa", "B. Cumbia", "C. Vallenato", "D. Merengue"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'britpop' dans les années 90 ?",
+                    options: ["A. Blur", "B. Oasis", "C. Pulp", "D. Suede"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle ukrainienne ?",
+                    options: ["A. Hopak", "B. Kozachok", "C. Bandura", "D. Kobzar"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The King of Latin Music' ?",
+                    options: ["A. Ricky Martin", "B. Marc Anthony", "C. Tito Puente", "D. Celia Cruz"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle polonaise ?",
+                    options: ["A. Polonaise", "B. Mazurka", "C. Oberek", "D. Krakowiak"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'rock alternatif' avec 'Smells Like Teen Spirit' ?",
+                    options: ["A. Radiohead", "B. Nirvana", "C. Pearl Jam", "D. Foo Fighters"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle roumaine ?",
+                    options: ["A. Doina", "B. Hora", "C. Sirba", "D. Lautari"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The Queen of R&B' ?",
+                    options: ["A. Aretha Franklin", "B. Whitney Houston", "C. Beyoncé", "D. Alicia Keys"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle bulgare ?",
+                    options: ["A. Chalga", "B. Kopanitsa", "C. Ruchenitsa", "D. Horo"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'metal symphonique' avec Nightwish ?",
+                    options: ["A. Within Temptation", "B. Epica", "C. Nightwish", "D. Therion"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle serbe ?",
+                    options: ["A. Turbo-folk", "B. Kolo", "C. Sevdalinka", "D. Ganga"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The King of Reggae' ?",
+                    options: ["A. Bob Marley", "B. Peter Tosh", "C. Jimmy Cliff", "D. Burning Spear"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle tchèque ?",
+                    options: ["A. Polka", "B. Furiant", "C. Sousedská", "D. Verbunk"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'rock psychédélique' avec 'Sgt. Pepper' ?",
+                    options: ["A. The Doors", "B. Pink Floyd", "C. The Beatles", "D. Jefferson Airplane"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle slovaque ?",
+                    options: ["A. Fujara", "B. Gajdy", "C. Cimbalom", "D. Kroj"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The King of the Blues' ?",
+                    options: ["A. B.B. King", "B. Muddy Waters", "C. John Lee Hooker", "D. Howlin' Wolf"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle lituanienne ?",
+                    options: ["A. Sutartinės", "B. Daina", "C. Kanklės", "D. Polka"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'rock gothique' avec 'Bela Lugosi's Dead' ?",
+                    options: ["A. The Cure", "B. Siouxsie and the Banshees", "C. Bauhaus", "D. Sisters of Mercy"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle lettone ?",
+                    options: ["A. Daina", "B. Kokle", "C. Suiti", "D. Dziesma"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The Queen of Jazz' ?",
+                    options: ["A. Billie Holiday", "B. Ella Fitzgerald", "C. Nina Simone", "D. Sarah Vaughan"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle estonienne ?",
+                    options: ["A. Regilaul", "B. Kannel", "C. Seto", "D. Leelo"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'rock industriel' avec Nine Inch Nails ?",
+                    options: ["A. Ministry", "B. KMFDM", "C. Nine Inch Nails", "D. Rammstein"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle finlandaise ?",
+                    options: ["A. Joik", "B. Kantele", "C. Humppa", "D. Pelimanni"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The King of Country' ?",
+                    options: ["A. Johnny Cash", "B. Willie Nelson", "C. Hank Williams", "D. George Strait"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle islandaise ?",
+                    options: ["A. Rímur", "B. Tvísöngur", "C. Langspil", "D. Fídel"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'rock expérimental' avec Radiohead ?",
+                    options: ["A. Muse", "B. Radiohead", "C. Coldplay", "D. Arcade Fire"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle norvégienne ?",
+                    options: ["A. Hardanger", "B. Kveding", "C. Gangar", "D. Slått"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The Queen of Disco' ?",
+                    options: ["A. Donna Summer", "B. Gloria Gaynor", "C. Diana Ross", "D. Cher"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle suédoise ?",
+                    options: ["A. Polska", "B. Spelman", "C. Nyckelharpa", "D. Kulning"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'rock indépendant' avec The Strokes ?",
+                    options: ["A. The White Stripes", "B. The Strokes", "C. The Killers", "D. Arctic Monkeys"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle danoise ?",
+                    options: ["A. Pols", "B. Folkevise", "C. Gammeldans", "D. Spillemand"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The Queen of Hip-Hop Soul' ?",
+                    options: ["A. Mary J. Blige", "B. Lauryn Hill", "C. Missy Elliott", "D. Queen Latifah"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle autrichienne ?",
+                    options: ["A. Ländler", "B. Schrammelmusik", "C. Yodel", "D. Wienerlied"],
+                    correctAnswer: "D"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'rock garage' avec The Hives ?",
+                    options: ["A. The Vines", "B. The Hives", "C. Jet", "D. The Kills"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle suisse ?",
+                    options: ["A. Yodel", "B. Ländler", "C. Alphorn", "D. Schwyzerörgeli"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The King of Swing' ?",
+                    options: ["A. Benny Goodman", "B. Glenn Miller", "C. Duke Ellington", "D. Count Basie"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle belge ?",
+                    options: ["A. Chanson", "B. Musette", "C. Vlaamse", "D. Borinage"],
+                    correctAnswer: "C"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'rock progressif belge' avec dEUS ?",
+                    options: ["A. dEUS", "B. Soulwax", "C. Hooverphonic", "D. K's Choice"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle néerlandaise ?",
+                    options: ["A. Levenslied", "B. Palingsound", "C. Smartlap", "D. Carnaval"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The Queen of Folk' ?",
+                    options: ["A. Joan Baez", "B. Joni Mitchell", "C. Judy Collins", "D. Odetta"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle luxembourgeoise ?",
+                    options: ["A. Éislek", "B. Guttland", "C. Moselle", "D. Trëppelt"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'rock français' avec Noir Désir ?",
+                    options: ["A. Téléphone", "B. Noir Désir", "C. Trust", "D. Indochine"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle monégasque ?",
+                    options: ["A. Farandole", "B. Tambourin", "C. Galoubet", "D. Fête"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The Queen of Gospel' ?",
+                    options: ["A. Mahalia Jackson", "B. Aretha Franklin", "C. Shirley Caesar", "D. Clara Ward"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle andorrane ?",
+                    options: ["A. Contrapàs", "B. Sardana", "C. Jota", "D. Fandango"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel groupe a popularisé le 'rock espagnol' avec Héroes del Silencio ?",
+                    options: ["A. Mecano", "B. Héroes del Silencio", "C. Radio Futura", "D. La Unión"],
+                    correctAnswer: "B"
+                },
+                {
+                    question: "Quel est le nom de la musique traditionnelle portugaise ?",
+                    options: ["A. Fado", "B. Cante", "C. Vira", "D. Chula"],
+                    correctAnswer: "A"
+                },
+                {
+                    question: "Quel artiste est connu comme 'The Queen of Tejano' ?",
+                    options: ["A. Selena", "B. Jennifer Peña", "C. Laura Canales", "D. Elsa García"],
+                    correctAnswer: "A"
+                }
+            ],
+    // [Les autres catégories restent inchangées]
+};
+   
+        // Initialisation du jeu
+        function initGame() {
+            updateTotalStarsDisplay();
+            updateCategoryLocks();
+        }
+        
+        // Vérifier si une catégorie est verrouillée
+        function checkCategoryLock(category) {
+            const requiredStars = 35;
+            if (totalStars >= requiredStars) {
+                startGame(category);
+            } else {
+                alert(`Vous avez besoin de ${requiredStars} étoiles pour débloquer cette catégorie. Vous avez ${totalStars} étoiles.`);
+            }
+        }
+        
+        // Mettre à jour l'affichage des verrous de catégorie
+        function updateCategoryLocks() {
+            const sportBtn = document.getElementById('sportCategoryBtn');
+            const musicBtn = document.getElementById('musicCategoryBtn');
+            const sportLockInfo = document.getElementById('sportLockInfo');
+            const musicLockInfo = document.getElementById('musicLockInfo');
+            
+            // Sport (35 étoiles)
+            if (totalStars >= 35) {
+                sportBtn.classList.remove('locked');
+                sportBtn.classList.add('unlock-animation');
+                sportLockInfo.style.display = 'none';
+                setTimeout(() => {
+                    sportBtn.classList.remove('unlock-animation');
+                }, 1500);
+            } else {
+                document.getElementById('sportStarsNeeded').textContent = totalStars;
+            }
+            
+            // Musique (100 étoiles totales, (65 supplémentaires)
+            if (totalStars >= 100) {
+                musicBtn.classList.remove('locked');
+                musicBtn.classList.add('unlock-animation');
+                musicLockInfo.style.display = 'none';
+                setTimeout(() => {
+                    musicBtn.classList.remove('unlock-animation');
+                }, 1500);
+            } else {
+                document.getElementById('musicStarsNeeded').textContent = Math.min(totalStars, 100);
+            }
+        }
+        
+        // Mettre à jour l'affichage des étoiles totales
+        function updateTotalStarsDisplay() {
+            document.getElementById('totalStarsCount').textContent = totalStars;
+        }
+        
+        // Sauvegarder les étoiles totales
+        function saveTotalStars() {
+            localStorage.setItem('totalStars', totalStars.toString());
+        }
+        
+        // Démarrer le jeu avec une catégorie
+        function startGame(category) {
+            currentCategory = category;
+            
+            // Filtrer et mélanger les questions
+            const allQuestions = questionsByCategory[category];
+            currentQuestions = shuffleArray([...allQuestions]);
+            
+            // Limiter à 20 questions pour une partie
+            if (currentQuestions.length > 20) {
+                currentQuestions = currentQuestions.slice(0, 20);
+            }
+            
+            currentQuestionIndex = 0;
+            score = 0;
+            lives = 5;
+            starsEarned = 0;
+            streakCount = 0;
+            consecutiveCorrectAnswers = 0;
+            jokerAvailable = false;
+            
+            // Réinitialiser les power-ups
+            powerups = {
+                extraTime: 1,
+                skipQuestion: 1,
+                fiftyFifty: 1
+            };
+            
+            // Mettre à jour l'interface
+            document.getElementById('categorySelector').style.display = 'none';
+            document.getElementById('quizInterface').style.display = 'block';
+            document.getElementById('quizCategory').textContent = getCategoryName(category);
+            document.getElementById('score').textContent = '0';
+            document.getElementById('livesCount').textContent = '5';
+            document.getElementById('starsCount').textContent = '0';
+            document.getElementById('endScreen').style.display = 'none';
+            document.getElementById('streakCounter').style.display = 'none';
+            document.getElementById('jokerContainer').style.display = 'none';
+            
+            // Charger la première question
+            loadQuestion();
+        }
+        
+        // Mélanger un tableau
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+        
+        // Définir la difficulté
+        function setDifficulty(difficulty) {
+            currentDifficulty = difficulty;
+            document.querySelectorAll('.difficulty-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+        
+        // Obtenir le nom complet de la catégorie
+        function getCategoryName(category) {
+            const names = {
+                'history': 'Histoire',
+                'science': 'Science',
+                'sport': 'Sport',
+                'music': 'Musique'
+            };
+            return names[category] || '';
+        }
+        
+        // Charger une question
+        function loadQuestion() {
+            if (currentQuestionIndex >= currentQuestions.length) {
+                endGame();
+                return;
+            }
+            
+            const question = currentQuestions[currentQuestionIndex];
+            const questionElement = document.getElementById('questionText');
+            const optionsContainer = document.getElementById('optionsContainer');
+            
+            // Mettre à jour le numéro de question
+            document.getElementById('questionNumber').textContent = 
+                `Question ${(currentQuestionIndex + 1).toString().padStart(2, '0')}`;
+            
+            // Mettre à jour la barre de progression
+            const progress = ((currentQuestionIndex) / currentQuestions.length) * 100;
+            document.getElementById('progressBar').style.width = `${progress}%`;
+            
+            // Afficher la question
+            questionElement.textContent = question.question;
+            
+            // Générer les options
+            optionsContainer.innerHTML = '';
+            question.options.forEach((option, index) => {
+                const optionElement = document.createElement('div');
+                optionElement.className = 'option';
+                optionElement.textContent = option;
+                
+                optionElement.onclick = function() {
+                    checkAnswer(option[0], question.correctAnswer);
+                };
+                
+                optionsContainer.appendChild(optionElement);
+            });
+            
+            // Réinitialiser le message
+            document.getElementById('message').style.display = 'none';
+            document.getElementById('message').className = 'message';
+            document.getElementById('bonusMessage').style.display = 'none';
+            
+            // Mettre à jour les power-ups
+            updatePowerups();
+            
+            // Vérifier si le bouton d'achat de cœur doit être activé
+            document.getElementById('buyHeartBtn').disabled = totalStars < 5;
+            
+            // Démarrer le timer
+            startTimer();
+        }
+        
+        // Démarrer le timer
+        function startTimer() {
+            clearInterval(timer);
+            
+            // Définir le temps selon la difficulté
+            timeLeft = currentDifficulty === 'easy' ? 25 : (currentDifficulty === 'medium' ? 20 : 15);
+            updateTimerDisplay();
+            
+            timer = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    handleTimeout();
+                }
+            }, 1000);
+        }
+        
+        // Mettre à jour l'affichage du timer
+        function updateTimerDisplay() {
+            document.getElementById('timer').textContent = `${timeLeft}s`;
+            
+            // Changer la couleur si le temps est critique
+            if (timeLeft <= 5) {
+                document.getElementById('timer').style.color = '#e74c3c';
+            } else {
+                document.getElementById('timer').style.color = '#333';
+            }
+        }
+        
+        // Gérer le temps écoulé
+        function handleTimeout() {
+            clearInterval(timer);
+            document.getElementById('message').textContent = "Temps écoulé !";
+            document.getElementById('message').className = 'message wrong';
+            document.getElementById('message').style.display = 'block';
+            
+            // Réinitialiser les compteurs de bonnes réponses consécutives
+            consecutiveCorrectAnswers = 0;
+            streakCount = 0;
+            document.getElementById('streakCounter').style.display = 'none';
+            
+            loseLife();
+            
+            // Passer à la question suivante si le jeu continue
+            if (lives > 0) {
+                currentQuestionIndex++;
+                setTimeout(loadQuestion, 1500);
+            }
+        }
+        
+        // Vérifier la réponse
+        function checkAnswer(selectedAnswer, correctAnswer) {
+            clearInterval(timer);
+            
+            const messageElement = document.getElementById('message');
+            messageElement.style.display = 'block';
+            
+            if (selectedAnswer === correctAnswer) {
+                // Bonne réponse
+                let pointsEarned = 10;
+                
+                // Bonus de difficulté
+                if (currentDifficulty === 'hard') pointsEarned = 15;
+                else if (currentDifficulty === 'easy') pointsEarned = 7;
+                
+                // Incrémenter les bonnes réponses consécutives
+                consecutiveCorrectAnswers++;
+                
+                // Bonus de streak
+                streakCount++;
+                if (streakCount >= 3) {
+                    const streakBonus = Math.floor(streakCount / 3) * 5;
+                    pointsEarned += streakBonus;
+                    
+                    // Afficher le streak
+                    const streakElement = document.getElementById('streakCounter');
+                    streakElement.textContent = streakCount;
+                    streakElement.style.display = 'inline-block';
+                    
+                    // Message bonus
+                    if (streakBonus > 0) {
+                        document.getElementById('bonusMessage').textContent = `Bonus de série: +${streakBonus} points!`;
+                        document.getElementById('bonusMessage').style.display = 'block';
+                    }
+                }
+                
+                score += pointsEarned;
+                messageElement.textContent = `Bonne réponse ! +${pointsEarned} points`;
+                messageElement.className = 'message correct';
+                
+                // Mettre en évidence la bonne réponse
+                highlightCorrectAnswer(correctAnswer);
+                
+                // Vérifier si on gagne une étoile (toutes les 3 bonnes réponses)
+                if (consecutiveCorrectAnswers % 3 === 0) {
+                    starsEarned++;
+                    totalStars++;
+                    document.getElementById('starsCount').textContent = starsEarned;
+                    updateTotalStarsDisplay();
+                    saveTotalStars();
+                    messageElement.textContent += " ⭐ Vous avez gagné une étoile !";
+                    
+                    // Vérifier le déblocage de catégories
+                    updateCategoryLocks();
+                }
+                
+                // Vérifier si on gagne une carte joker (10 bonnes réponses consécutives)
+                if (consecutiveCorrectAnswers === 10 && !jokerAvailable) {
+                    jokerAvailable = true;
+                    document.getElementById('jokerContainer').style.display = 'block';
+                    document.getElementById('bonusMessage').textContent = "Félicitations ! Vous avez gagné une carte Joker !";
+                    document.getElementById('bonusMessage').style.display = 'block';
+                }
+                
+                // Gagner un power-up aléatoire (20% de chance)
+                if (Math.random() < 0.2) {
+                    const randomPowerup = Object.keys(powerups)[Math.floor(Math.random() * Object.keys(powerups).length)];
+                    powerups[randomPowerup]++;
+                    updatePowerups();
+                    
+                    const bonusMessage = document.getElementById('bonusMessage');
+                    bonusMessage.textContent = `Bonus: Vous avez gagné un power-up ${getPowerupName(randomPowerup)}!`;
+                    bonusMessage.style.display = 'block';
+                }
+            } else {
+                // Mauvaise réponse
+                messageElement.textContent = `Mauvaise réponse ! La bonne réponse était : ${correctAnswer}`;
+                messageElement.className = 'message wrong';
+                
+                // Mettre en évidence les réponses
+                highlightCorrectAnswer(correctAnswer);
+                highlightWrongAnswer(selectedAnswer);
+                
+                // Réinitialiser les compteurs de bonnes réponses consécutives
+                consecutiveCorrectAnswers = 0;
+                streakCount = 0;
+                document.getElementById('streakCounter').style.display = 'none';
+                
+                loseLife();
+            }
+            
+            // Mettre à jour le score
+            document.getElementById('score').textContent = score;
+            
+            // Passer à la question suivante après un délai
+            setTimeout(() => {
+                if (lives > 0) {
+                    currentQuestionIndex++;
+                    loadQuestion();
+                }
+            }, 2000);
+        }
+        
+        // Mettre en évidence la bonne réponse
+        function highlightCorrectAnswer(correctAnswer) {
+            const options = document.querySelectorAll('.option');
+            options.forEach(option => {
+                if (option.textContent[0] === correctAnswer) {
+                    option.classList.add('correct');
+                }
+            });
+        }
+        
+        // Mettre en évidence la mauvaise réponse
+        function highlightWrongAnswer(selectedAnswer) {
+            const options = document.querySelectorAll('.option');
+            options.forEach(option => {
+                if (option.textContent[0] === selectedAnswer) {
+                    option.classList.add('wrong');
+                }
+            });
+        }
+        
+        // Perdre une vie
+        function loseLife() {
+            lives--;
+            document.getElementById('livesCount').textContent = lives;
+            
+            // Animation de perte de vie
+            const livesContainer = document.getElementById('livesContainer');
+            livesContainer.style.transform = 'scale(1.2)';
+            setTimeout(() => {
+                livesContainer.style.transform = 'scale(1)';
+            }, 300);
+            
+            if (lives <= 0) {
+                if (jokerAvailable) {
+                    // Afficher l'option d'utiliser le joker
+                    document.getElementById('jokerContainer').style.display = 'block';
+                } else {
+                    endGame();
+                }
+            }
+        }
+        
+        // Utiliser la carte joker
+        function useJoker() {
+            lives = 1;
+            jokerAvailable = false;
+            document.getElementById('livesCount').textContent = lives;
+            document.getElementById('jokerContainer').style.display = 'none';
+            
+            // Afficher un message
+            const bonusMessage = document.getElementById('bonusMessage');
+            bonusMessage.textContent = "Carte Joker utilisée ! Vous continuez avec 1 cœur.";
+            bonusMessage.style.display = 'block';
+            
+            // Continuer le jeu
+            currentQuestionIndex++;
+            loadQuestion();
+        }
+        
+        // Échanger des étoiles contre des cœurs
+        function tradeStarsForHearts() {
+            if (totalStars >= 5) {
+                totalStars -= 5;
+                lives++;
+                document.getElementById('livesCount').textContent = lives;
+                updateTotalStarsDisplay();
+                saveTotalStars();
+                
+                // Désactiver le bouton si plus assez d'étoiles
+                document.getElementById('buyHeartBtn').disabled = totalStars < 5;
+                
+                // Afficher un message
+                const bonusMessage = document.getElementById('bonusMessage');
+                bonusMessage.textContent = "1 cœur acheté avec 5 étoiles !";
+                bonusMessage.style.display = 'block';
+            }
+        }
+        
+        // Utiliser un power-up
+        function usePowerup(powerupType) {
+            if (powerups[powerupType] <= 0) return;
+            
+            powerups[powerupType]--;
+            updatePowerups();
+            
+            switch (powerupType) {
+                case 'extraTime':
+                    timeLeft += 10;
+                    updateTimerDisplay();
+                    showPowerupMessage("+10 secondes ajoutées !");
+                    break;
+                    
+                case 'skipQuestion':
+                    showPowerupMessage("Question passée !");
+                    currentQuestionIndex++;
+                    loadQuestion();
+                    break;
+                    
+                case 'fiftyFifty':
+                    const currentQuestion = currentQuestions[currentQuestionIndex];
+                    const options = document.querySelectorAll('.option');
+                    let incorrectRemoved = 0;
+                    
+                    options.forEach(option => {
+                        const optionLetter = option.textContent[0];
+                        if (optionLetter !== currentQuestion.correctAnswer && incorrectRemoved < 2) {
+                            option.style.opacity = '0.3';
+                            option.style.pointerEvents = 'none';
+                            incorrectRemoved++;
+                        }
+                    });
+                    
+                    showPowerupMessage("2 mauvaises réponses éliminées !");
+                    break;
+            }
+        }
+        
+        // Afficher un message pour le power-up utilisé
+        function showPowerupMessage(message) {
+            const bonusMessage = document.getElementById('bonusMessage');
+            bonusMessage.textContent = message;
+            bonusMessage.style.display = 'block';
+            setTimeout(() => {
+                bonusMessage.style.display = 'none';
+            }, 2000);
+        }
+        
+        // Mettre à jour l'affichage des power-ups
+        function updatePowerups() {
+            document.getElementById('extraTimeBtn').disabled = powerups.extraTime <= 0;
+            document.getElementById('skipQuestionBtn').disabled = powerups.skipQuestion <= 0;
+            document.getElementById('fiftyFiftyBtn').disabled = powerups.fiftyFifty <= 0;
+            
+            // Ajouter des indicateurs de quantité
+            document.getElementById('extraTimeBtn').title = `+10 secondes (${powerups.extraTime})`;
+            document.getElementById('skipQuestionBtn').title = `Passer la question (${powerups.skipQuestion})`;
+            document.getElementById('fiftyFiftyBtn').title = `50/50 (${powerups.fiftyFifty})`;
+        }
+        
+        // Obtenir le nom d'un power-up
+        function getPowerupName(powerupType) {
+            const names = {
+                'extraTime': '+10 secondes',
+                'skipQuestion': 'Passer la question',
+                'fiftyFifty': '50/50'
+            };
+            return names[powerupType] || '';
+        }
+        
+        // Terminer le jeu
+        function endGame() {
+            clearInterval(timer);
+            document.getElementById('quizInterface').style.display = 'none';
+            document.getElementById('endScreen').style.display = 'block';
+            
+            // Afficher le score final
+            document.getElementById('finalScore').textContent = `Votre score final: ${score}`;
+            
+            // Ajouter les étoiles gagnées au total
+            totalStars += starsEarned;
+            saveTotalStars();
+            
+            // Message de fin personnalisé
+            const endMessage = document.getElementById('endMessage');
+            if (score >= 180) {
+                endMessage.textContent = "Incroyable ! Vous êtes un véritable expert !";
+                endMessage.style.color = "#27ae60";
+            } else if (score >= 120) {
+                endMessage.textContent = "Excellent travail ! Vous maîtrisez bien ce sujet.";
+                endMessage.style.color = "#2ecc71";
+            } else if (score >= 80) {
+                endMessage.textContent = "Bon score ! Vous avez de bonnes connaissances.";
+                endMessage.style.color = "#f39c12";
+            } else if (score >= 40) {
+                endMessage.textContent = "Pas mal ! Vous pouvez encore vous améliorer.";
+                endMessage.style.color = "#e67e22";
+            } else {
+                endMessage.textContent = "Continuez à pratiquer ! Vous allez progresser.";
+                endMessage.style.color = "#e74c3c";
+            }
+            
+            // Afficher les étoiles gagnées
+            const starsContainer = document.getElementById('starsEarnedContainer');
+            starsContainer.innerHTML = '<div>Étoiles gagnées cette partie:</div>';
+            
+            for (let i = 0; i < starsEarned; i++) {
+                const star = document.createElement('span');
+                star.className = 'star-earned';
+                star.textContent = '⭐';
+                starsContainer.appendChild(star);
+            }
+            
+            // Mettre à jour l'affichage des étoiles totales
+            updateTotalStarsDisplay();
+            updateCategoryLocks();
+        }
+        
+        // Redémarrer le jeu
+        function restartGame() {
+            document.getElementById('endScreen').style.display = 'none';
+            document.getElementById('categorySelector').style.display = 'block';
+        }
+        
+        // Initialiser le jeu au chargement de la page
+        window.onload = function() {
+            initGame();
+        };
+    </script>
+</body>
+</html>
